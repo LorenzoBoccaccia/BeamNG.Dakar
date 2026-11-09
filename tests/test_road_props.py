@@ -408,20 +408,24 @@ def test_a_rebuilt_navgraph_counts_even_when_the_hook_was_missed(lua):
 
 # --- the offline check of the booth against the roads round the lot (tools/booth.py) ----------------------------------------------
 
-def test_the_popoli_tc0_table_stands_on_the_road_out_of_the_lot_and_is_not_placed(pure):
-    """The table the player found: the table of the first transfer's start stands 9 m beside the leg's line at s = 8 m, which in the
-    lot is a loop of the drive; the leg comes back past it."""
+def test_the_popoli_tc0_table_stands_along_the_lead_before_tc0_not_on_the_road_out_of_the_lot(pure):
+    """The table the player found: the table of the first transfer's start stood 9 m beside the leg's line at s = 8 m, which in the
+    lot is a loop of the drive (the leg comes back past it) and was not placed. The service park now stands before TC0 along the
+    way the car comes (the lot's lead), where the car drives through it: the table stands beside the lead, off the leg's road."""
     rt, props, rc = pure["rt"], pure["props"], pure["rc"]
     rt.execute("package.path = package.path .. ';%s/?.lua'" % EARTH_EXT)
     geodesy, legs = rt.eval("(require('beamngEarth/geodesy'))"), rt.eval("(require('beamngDakar/legs'))")
     edition = json.load(open(os.path.join(POPOLI, "legs.json"), encoding="utf-8"))
     geo = {l["id"]: json.load(open(os.path.join(POPOLI, "geometry", l["id"] + ".json"))) for l in edition["legs"]}
-    spawn = geo[edition["legs"][0]["id"]]["servicePark"]["spawn"]
+    first = edition["legs"][0]["id"]
+    spawn = geo[first]["servicePark"]["spawn"]
     anchor = geodesy.newAnchor(spawn["lat"], spawn["lon"])
     by_leg = rt.table()
     for leg in edition["legs"]:
         by_leg[leg["id"]] = legs.toWorld(conv(rt, geo[leg["id"]]["points"]), anchor)
-    placed = props.place(props.layout(conv(rt, edition), rt.table()), by_leg)
+    lead = rt.table()
+    lead[first] = legs.toWorld(conv(rt, geo[first]["servicePark"]["lead"]), anchor)
+    placed = props.place(props.layout(conv(rt, edition), rt.table()), by_leg, lead)
     own = rc.new()
     for leg in edition["legs"]:
         own.addLine(own, by_leg[leg["id"]], rc.OWN_HALF_M)
@@ -431,6 +435,9 @@ def test_the_popoli_tc0_table_stands_on_the_road_out_of_the_lot_and_is_not_place
         fp = props.footprint(str(p.kind))
         if fp and rc.hit(p, fp, None, own, None):
             got[str(p.id)] = str(p.kind)
-    assert got.get("road1:table") == "table", got
+    assert "road1:table" not in got and "road1:tc_in" not in got, got
+    table = next(placed[i] for i in range(1, len(placed) + 1) if str(placed[i].id) == "road1:table")
+    pts = [(lead[first][k][1], lead[first][k][2]) for k in range(1, len(lead[first]) + 1)]
+    assert min(math.dist((table.x, table.y), q) for q in pts) < 12                    # (beside the lead the car drives)
     # and what stands beside the road, as designed, is not dropped: the start boards, sensors and finish boards
     assert not [k for k in got.values() if k in ("start_board", "finish_board", "start_sensor", "radio_point", "tc_board")]

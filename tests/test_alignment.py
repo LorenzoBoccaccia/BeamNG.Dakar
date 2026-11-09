@@ -80,6 +80,23 @@ class World:
         # (the way the control points its +y, which the rally nodes read as the way on, turned by the game's own `q * v`)
         return sp["name"], (sp["pos"][1], sp["pos"][2], sp["pos"][3]), bq.heading(q), q
 
+    def lead_tables(self):
+        """{leg id: the lot lead's world points}, as core.lua gives them to props.place (a leg without a lot has none)."""
+        out = self.rt.table()
+        for i in self.ids:
+            lead = (self.geo[i].get("servicePark") or {}).get("lead")
+            if lead and len(lead) >= 2:
+                out[i] = self.legs.toWorld(conv(self.rt, lead), self.anchor)
+        return out
+
+    def lead(self, leg):
+        """The lot lead's world points (x, y, z) read into Python, or None."""
+        lead = (self.geo[leg].get("servicePark") or {}).get("lead")
+        if not (lead and len(lead) >= 2):
+            return None
+        w = self.legs.toWorld(conv(self.rt, lead), self.anchor)
+        return [(w[k][1], w[k][2], w[k][3]) for k in range(1, len(w) + 1)]
+
     def road(self, leg, at_end, window=10.0):
         """The direction (degrees counter-clockwise from +x) the leg goes in over its first / last `window` metres."""
         w = self.world[leg][::-1] if at_end else self.world[leg]
@@ -320,7 +337,7 @@ def props_by_id(w):
     by_leg = w.rt.table()
     for i in w.ids:
         by_leg[i] = w.legs.toWorld(conv(w.rt, w.geo[i]["points"]), w.anchor)
-    placed = w.props.place(defs, by_leg)
+    placed = w.props.place(defs, by_leg, w.lead_tables())
     return {placed[k]["id"]: placed[k] for k in range(1, len(placed) + 1)}, {defs[k]["id"]: defs[k] for k in range(1, len(defs) + 1)}
 
 
@@ -337,19 +354,42 @@ def along(w, leg, s):
         left -= d
 
 
+def approach_along(w, leg, s):
+    """Where a prop `s` metres (<= 0) before the leg's start stands in the way the car comes: back along the lot's lead from TC0 (and on
+    along its first segment past the spawn), else along the leg's first segment extended backwards; and the direction of travel there."""
+    lead = w.lead(leg)
+    if lead:
+        left = -s                                            # metres back from the end of the lead
+        for a, b in zip(lead[::-1], lead[::-1][1:]):
+            d = math.dist(a, b)                              # (along the 3D path, as the mod measures it)
+            h = math.hypot(b[0] - a[0], b[1] - a[1])
+            direction = ((a[0] - b[0]) / h, (a[1] - b[1]) / h)
+            if d >= left or b is lead[0]:
+                f = left / d
+                return (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f), direction
+            left -= d
+    (x, y), (dx, dy) = along(w, leg, 0)
+    return (x + dx * s, y + dy * s), (dx, dy)
+
+
 def check_props_face_the_road(w):
-    """Nothing is mirrored: a prop facing the driver has its front against the direction of travel, 'along' along it, 'out' to
-    the right of the road, and a prop 'lateral' metres to the right of the road stands there, wherever the road goes (the
-    model's front is local +y, yaw counter-clockwise from +x)."""
+    """Nothing is mirrored, read with the game's own quaternion maths (beamng_quat.py) of the orientation the mod hands to setPosRot
+    (props.poseQuat): a prop facing the driver has its front (local +y) against the direction of travel, 'along' along it, 'out'
+    to the right of the road; a 'sign' (a signboard, whose printed face is its local -y) has its +y along the travel direction so
+    that the face looks at the car that comes. A prop 'lateral' metres to the right of the road stands there, wherever the road
+    goes; an approach prop stands on the way the car comes to the leg's start."""
     placed, defs = props_by_id(w)
     assert placed
     seen = set()
     for pid, p in placed.items():
         d = defs[pid]
-        total = sum(math.dist(a, b) for a, b in zip(w.world[p["leg"]], w.world[p["leg"]][1:]))
-        s = total - d["s"] if d["fromEnd"] else d["s"]
-        (x, y), (dx, dy) = along(w, p["leg"], s)
-        fx, fy = math.cos(math.radians(p["yaw"] + 90)), math.sin(math.radians(p["yaw"] + 90))
+        if d["approach"] and not d["fromEnd"]:
+            (x, y), (dx, dy) = approach_along(w, p["leg"], d["s"])
+        else:
+            total = sum(math.dist(a, b) for a, b in zip(w.world[p["leg"]], w.world[p["leg"]][1:]))
+            s = total - d["s"] if d["fromEnd"] else d["s"]
+            (x, y), (dx, dy) = along(w, p["leg"], s)
+        fx, fy, _ = bq.rotate(tuple(w.props.poseQuat(p["yaw"])), (0, 1, 0))                    # (the model's +y in the world)
         dot, right = fx * dx + fy * dy, fx * dy - fy * dx          # (dy, -dx) is to the right of the direction of travel
         if not d["autoSide"]:
             assert math.dist((p["x"], p["y"]), (x + d["lateral"] * dy, y - d["lateral"] * dx)) < 0.02, pid
@@ -358,12 +398,12 @@ def check_props_face_the_road(w):
         want = d["facing"]
         if want == "driver":
             assert dot < -0.999, (pid, dot)
-        elif want == "along":
+        elif want in ("along", "sign"):
             assert dot > 0.999, (pid, dot)
         else:
             assert right > 0.999, (pid, right)
         seen.add(want)
-    assert seen == {"driver", "along", "out"}
+    assert seen == {"driver", "along", "out", "sign"}
     return placed
 
 
@@ -379,3 +419,75 @@ def test_every_prop_of_a_synthetic_loop_faces_the_road_and_a_join_is_dressed_onc
 
 def test_every_prop_of_both_real_editions_faces_the_road(real):
     check_props_face_the_road(real)
+
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# the service park lies along the car's route, the board at its end faces the car
+
+SERVICE_PARK_DRESSING = ("cone_r", "cone_l", "flag1", "flag2", "table", "chair1", "chair2", "park_tower", "park_feather")
+
+
+def project(route, p):
+    """(distance along the polyline route to the point nearest p, signed lateral offset to the right of the way it goes there)."""
+    best = None
+    acc = 0.0
+    for a, b in zip(route, route[1:]):
+        d = math.dist(a, b)
+        ux, uy = (b[0] - a[0]) / d, (b[1] - a[1]) / d
+        t = max(0.0, min(d, (p[0] - a[0]) * ux + (p[1] - a[1]) * uy))
+        qx, qy = a[0] + ux * t, a[1] + uy * t
+        dist = math.hypot(p[0] - qx, p[1] - qy)
+        if best is None or dist < best[0] - 1e-9:
+            best = (dist, acc + t, (p[0] - qx) * uy - (p[1] - qy) * ux)
+        acc += d
+    return best[1], best[2]
+
+
+def test_the_testbed_car_drives_through_the_service_park_and_reaches_the_board_that_faces_it(rt):
+    """The testbed's real geometry: the car on its stall (the lead's start, 20 m before TC0), TC0 ahead, the lot's exit on past it, all on
+    one line. The route the car drives is the stall -> TC0 (the lead) -> the leg (TC0 -> the exit). The cones, flags, table, chairs
+    and the landmark stand along its first 20 m, on both sides, and the board stands where they end, with its printed face to the car."""
+    edition, geo = load("testbed-algarve")
+    first = edition["legs"][0]["id"]
+    w = World(rt, edition, geo, geo[first]["points"][0][:2])
+    placed, defs = props_by_id(w)
+    pl = w.res["placement"]
+    spawn = (pl["pos"][1], pl["pos"][2])
+    lead = [p[:2] for p in w.lead(first)]
+    assert math.dist(spawn, lead[0]) < 1e-6
+    tc0 = lead[-1]
+    assert math.dist(tc0, w.world[first][0][:2]) < 0.05
+    # (the route over the lead and the leg's first 40 m past TC0: the leg runs on to the lot's exit and turns, coming back near the table)
+    beyond, walked = [], 0.0
+    for a, b in zip(w.world[first], w.world[first][1:]):
+        if walked >= 40:
+            break
+        walked += math.dist(a, b)
+        beyond.append(b[:2])
+    route = lead + beyond
+    to_tc0 = sum(math.dist(a, b) for a, b in zip(lead, lead[1:]))
+    assert 15 <= to_tc0 <= 25
+    # the car's own front (the stall orientation, read with the game's rotation) is the way the route goes
+    front = bq.car_heading(quat(pl["rot"]))
+    assert off(front, math.degrees(math.atan2(route[1][1] - route[0][1], route[1][0] - route[0][0]))) < 5
+
+    board = placed[first + ":tc_in"]
+    t_board, side = project(route, (board["x"], board["y"]))
+    assert abs(t_board - to_tc0) < 0.5 and side == pytest.approx(5.5, abs=0.3)               # at TC0, 5.5 m right of the way
+    # the board's printed face (local -y) looks at the car: against the way the car faces
+    face = bq.rotate(tuple(w.props.poseQuat(board["yaw"])), (0, -1, 0))
+    fx, fy = math.cos(math.radians(front)), math.sin(math.radians(front))
+    assert face[0] * fx + face[1] * fy < -0.99
+
+    dressing = {pid: p for pid, p in placed.items() if pid.startswith(first + ":") and
+                any(pid.split(":", 1)[1].startswith(k) for k in SERVICE_PARK_DRESSING)}
+    assert len(dressing) >= 16
+    for pid, p in dressing.items():
+        t, lateral = project(route, (p["x"], p["y"]))
+        assert 0 < t < t_board - 0.5, (pid, t)                      # after the stall and before the board: the car drives through it
+        assert abs(lateral) <= 17, (pid, lateral)
+    cones = {s: [project(route, (p["x"], p["y"])) for pid, p in dressing.items() if ":cone_" + s in pid] for s in ("r", "l")}
+    assert all(len(v) >= 3 for v in cones.values())
+    assert all(lat > 6 for _, lat in cones["r"]) and all(lat < -6 for _, lat in cones["l"])          # on both sides of the way
+    assert min(t for t, _ in cones["r"] + cones["l"]) > 0 and max(t for t, _ in cones["r"] + cones["l"]) < t_board

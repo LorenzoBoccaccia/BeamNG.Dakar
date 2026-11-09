@@ -5,6 +5,8 @@ import os
 
 import pytest
 
+import beamng_quat as bq
+
 lupa = pytest.importorskip("lupa")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -93,15 +95,74 @@ def test_the_start_boards_stand_5_and_a_half_metres_either_side_of_the_road(worl
     assert (r["x"] - l["x"]) * hy - (r["y"] - l["y"]) * hx > 0
 
 
-def test_a_driver_facing_board_has_its_front_against_the_direction_of_travel(world):
-    _, by_leg, items = world
-    p = next(i for i in items if i["id"] == "ss1:start_r")
+def by_id(items, pid):
+    return next(i for i in items if i["id"] == pid)
+
+
+def dir_at(road, s):
+    """The unit direction (x, y) of travel `s` metres along a road polyline (worked out here, not by the mod)."""
+    for a, b in zip(road, road[1:]):
+        d = math.dist(a, b)
+        if d >= s:
+            return (b[0] - a[0]) / d, (b[1] - a[1]) / d
+        s -= d
+    a, b = road[-2], road[-1]
+    d = math.dist(a, b)
+    return (b[0] - a[0]) / d, (b[1] - a[1]) / d
+
+
+def length(road):
+    return sum(math.dist(a, b) for a, b in zip(road, road[1:]))
+
+
+def local_axis(rt, item, axis):
+    """Where the model's local `axis` points in the world (x, y) once the game turns the orientation the mod hands to setPosRot
+    for the prop's yaw: the game's own `q * v` (beamng_quat.py)."""
+    props = rt.eval("(require('beamngDakar/props'))")
+    v = bq.rotate(tuple(props.poseQuat(item["yaw"])), axis)
+    return v[0], v[1]
+
+
+def dot(a, b):
+    return (a[0] * b[0] + a[1] * b[1]) / (math.hypot(*a) * math.hypot(*b))
+
+
+def test_a_driver_facing_prop_has_its_front_against_the_direction_of_travel(world):
+    rt, by_leg, items = world
+    p = by_id(items, "ss1:sensor_r")
     road = road_points(by_leg, "ss1")
-    hx, hy = road[1][0] - road[0][0], road[1][1] - road[0][1]
-    n = math.hypot(hx, hy)
-    # the model's front is its local +y: yaw is the turn of local +x, counter-clockwise from +x
-    fx, fy = math.cos(math.radians(p["yaw"] + 90)), math.sin(math.radians(p["yaw"] + 90))
-    assert (fx * hx + fy * hy) / n < -0.95
+    # the model's front is its local +y, read with the game's rotation
+    assert dot(local_axis(rt, p, (0, 1, 0)), dir_at(road, 0)) < -0.999
+
+
+def test_a_signboard_shows_its_printed_face_to_the_car_that_comes(world):
+    """The board's printed face is the model's local -y (the stock loops stand every board with its +y along the route, test_stock_boards
+    below): seen from the road it must look back at the oncoming car, wherever on the route it stands. A board put with +y against
+    the travel direction shows its back."""
+    rt, by_leg, items = world
+    ss1, road1 = road_points(by_leg, "ss1"), road_points(by_leg, "road1")
+    boards = [("ss1:start_l", ss1, 0), ("ss1:start_r", ss1, 0), ("ss1:fin_l", ss1, length(ss1)), ("ss1:fin_r", ss1, length(ss1)),
+              ("ss1:fin_entry", ss1, length(ss1) - 250), ("road1:stagein_tc", road1, length(road1)),
+              ("road1:stagein_tc_entry", road1, length(road1) - 50)]
+    for pid, road, s in boards:
+        p = by_id(items, pid)
+        travel = dir_at(road, s)
+        face = local_axis(rt, p, (0, -1, 0))
+        assert dot(face, travel) < -0.999, (pid, dot(face, travel))             # (looks at the car: against the way it goes)
+        assert dot(local_axis(rt, p, (0, 1, 0)), travel) > 0.999, pid           # (and its back, +y, goes the way the car goes)
+
+
+def test_the_split_boards_and_their_warnings_show_their_faces_to_the_car_too(world):
+    rt, by_leg, items = world
+    ss1 = road_points(by_leg, "ss1")
+    boards = [p for p in items if str(p["id"]).startswith("ss1:split") and str(p["kind"]) in
+              ("radio_point", "medical_point", "radio_warning", "medical_warning")]
+    assert boards
+    for p in boards:
+        # (the nearest road point's direction: the boards are within a few metres of the line)
+        i = min(range(len(ss1) - 1), key=lambda k: math.dist((p["x"], p["y"]), ss1[k]))
+        travel = (ss1[i + 1][0] - ss1[i][0], ss1[i + 1][1] - ss1[i][1])
+        assert dot(local_axis(rt, p, (0, -1, 0)), travel) < -0.9, p["id"]
 
 
 def test_the_finish_props_stand_at_the_end_of_the_stage(world):
@@ -166,10 +227,6 @@ def test_each_split_checkpoint_has_its_radio_and_medical_boards_and_their_warnin
 # ---------------------------------------------------------------------------------------------------------------------
 # The staging area at the end of a transfer: the time control before the special, dressed like the service
 # park, so the player can see where it is from the approach
-
-def by_id(items, pid):
-    return next(i for i in items if i["id"] == pid)
-
 
 def test_the_staging_area_stands_at_the_end_of_the_transfer(world):
     _, by_leg, items = world
@@ -347,3 +404,49 @@ def test_the_known_shapes_are_in_the_games_own_content():
     names = set(zipfile.ZipFile(GAME_ART).namelist())
     missing = [s for s in known_shapes() if s.lstrip("/") not in names]
     assert not missing, missing
+
+
+SIGNBOARDS = ("start", "finish", "finish_entry", "radio_point", "radio_point_warning", "medical_point", "medical_warning",
+              "time_control", "time_control_entry")
+
+
+@pytest.mark.skipif(not os.path.isfile(GAME_ART), reason="BeamNG.drive not found (set BEAMNG_DRIVE_DIR)")
+@pytest.mark.parametrize("board", SIGNBOARDS)
+def test_a_signboard_model_is_printed_on_its_minus_y_face(board):
+    """What the 'sign' facing rests on, from the game's own model: the board's printed face is a plane at y = 0 whose normal is (0, -1, 0),
+    the slab behind it (the board's thickness) at y > 0."""
+    import re
+    import zipfile
+    text = zipfile.ZipFile(GAME_ART).read("art/shapes/race/rally/rally_assets/s_rally_signboard_%s.dae" % board).decode()
+
+    def floats(src):
+        return [float(v) for v in re.search(r'id="signboard-mesh-%s-array"[^>]*>([^<]*)<' % src, text).group(1).split()]
+    pos, nor = floats("positions"), floats("normals")
+    idx = [int(v) for v in re.search(r"<p>([^<]*)</p>", text).group(1).split()]
+    face = []
+    for k in range(0, len(idx), 12):                    # (a triangle: three vertices of vertex, normal, texcoord, colour)
+        tri = idx[k:k + 12]
+        verts = [tri[0], tri[4], tri[8]]
+        normals = {tri[1], tri[5], tri[9]}
+        if all(pos[3 * v + 1] == 0 for v in verts):
+            face += [tuple(nor[3 * n:3 * n + 3]) for n in normals]
+    assert face and all(n[1] < -0.99 for n in face)
+    assert max(pos[1::3]) > 0.005                           # (the rest of the board is behind the face)
+
+
+def test_the_stock_loops_stand_their_boards_with_their_plus_y_along_the_route():
+    """Numbers copied from the game's gameplay/missions/italy: the prefab's rotationMatrix (a stored row is the world direction of a model
+    axis: row 1 is +y; checked against every start, finish and split board of the Italy and Utah loops, which all have it along the
+    route's own direction, 0.94 to 1.0, where the columns are anywhere) and the route's pathnode normal there."""
+    cases = [
+        # rallyLoop/ngrc25 (SS_start board) and rallyStage/ngrc25-cava-di-granito start node normal
+        ((-0.2609, -0.9654, 0, 0.9654, -0.2609, 0), (0.94191750998707, -0.33076027629546)),
+        # the finish boards and that stage's end node normal
+        ((0.0399, -0.9992, 0, 0.9992, 0.0399, 0), (0.99614352093573, 0.052334930899177)),
+        ((0.1751, -0.9846, 0, 0.9846, 0.1751, 0), (0.99614352093573, 0.052334930899177)),
+    ]
+    for m, normal in cases:
+        plus_y = (m[3], m[4])
+        assert dot(plus_y, normal) > 0.94
+        # (so the face, local -y, looks back at the car coming along the route)
+        assert dot((-plus_y[0], -plus_y[1]), normal) < -0.94

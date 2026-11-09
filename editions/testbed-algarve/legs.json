@@ -1,0 +1,40 @@
+{
+  "edition": "testbed-algarve",
+  "title": "Testbed: Algarve",
+  "missionPrefix": "dakar-testbed",
+  "note": "A minimal loop for finding out what rally data does when BeamNG.Earth rebases its origin. Not a Dakar stage: public roads near Faro, one transfer and one timed stage long enough to cross several rebases. Waypoints are lat/lon; tools/fetch_route.py turns each leg's 'via' into road geometry (geometry/<id>.json).",
+  "legs": [
+    {
+      "id": "road1",
+      "type": "transfer",
+      "title": "Service to stage start",
+      "via": [
+        [
+          37.0884,
+          -7.9755
+        ],
+        [
+          37.153,
+          -7.887
+        ]
+      ],
+      "speedLimitKph": 80,
+      "parkingNear": 1500
+    },
+    {
+      "id": "ss1",
+      "type": "special",
+      "title": "Sao Bras to Alte",
+      "via": [
+        [
+          37.153,
+          -7.887
+        ],
+        [
+          37.2338,
+          -8.1733
+        ]
+      ]
+    }
+  ]
+}

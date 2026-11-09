@@ -1,0 +1,158 @@
+{
+  "edition": "svolte-di-popoli",
+  "title": "Svolte di Popoli",
+  "missionPrefix": "dakar-popoli",
+  "shaping": { "spikeM": 3 },
+  "note": "The Svolte di Popoli hillclimb (SR17, Strada Regionale 17 delle Svolte di Popoli, Abruzzo) as a rally loop with a single special stage: from contrada Canapine above Popoli Terme (about 250 m) to San Benedetto in Perillis at the gate of the Navelli plateau (about 725 m), 7.5 km at 6.3 percent. The 'via' points lie on the SR17 line chained from OpenStreetMap, close enough together that OSRM follows its hairpins; tools/fetch_route.py turns them into road geometry (geometry/<id>.json).",
+  "legs": [
+    {
+      "id": "road1",
+      "type": "transfer",
+      "title": "Service park to stage start",
+      "via": [
+        [
+          42.17525,
+          13.82296
+        ],
+        [
+          42.17481,
+          13.82352
+        ],
+        [
+          42.174827,
+          13.824307
+        ]
+      ],
+      "speedLimitKph": 50,
+      "parkingNear": 300,
+      "note": "The service park is the car park on the side road west of the SR17 above the railway. The car starts on an aisle of the lot and TC0 is a few metres ahead of it, inside the lot (GitHub #55). The transfer leaves by the side road and turns onto the SR17 heading north, and TC1 and the stage start stand about 40 m up the SR17 past that turn, so the transfer is driven into TC1 from behind and the stage carries on straight ahead (tools/joins.py checks it). The SR17's underpass under the railway at 42.1710, 13.8247 (OSM way 479181637, tunnel) is blocked in the game (GitHub #50), so neither the transfer nor the stage goes through it."
+    },
+    {
+      "id": "ss1",
+      "type": "special",
+      "title": "Popoli to San Benedetto in Perillis",
+      "via": [
+        [
+          42.174827,
+          13.824307
+        ],
+        [
+          42.17681,
+          13.82452
+        ],
+        [
+          42.17895,
+          13.82504
+        ],
+        [
+          42.17753,
+          13.82691
+        ],
+        [
+          42.17817,
+          13.82716
+        ],
+        [
+          42.18029,
+          13.82648
+        ],
+        [
+          42.18236,
+          13.82534
+        ],
+        [
+          42.18434,
+          13.82393
+        ],
+        [
+          42.18639,
+          13.82328
+        ],
+        [
+          42.18808,
+          13.8231
+        ],
+        [
+          42.18889,
+          13.82052
+        ],
+        [
+          42.187,
+          13.81984
+        ],
+        [
+          42.18668,
+          13.817
+        ],
+        [
+          42.18768,
+          13.81428
+        ],
+        [
+          42.18773,
+          13.81168
+        ],
+        [
+          42.18829,
+          13.80887
+        ],
+        [
+          42.18783,
+          13.80613
+        ],
+        [
+          42.18741,
+          13.80336
+        ],
+        [
+          42.1872,
+          13.80052
+        ],
+        [
+          42.18643,
+          13.79773
+        ],
+        [
+          42.18638,
+          13.79697
+        ],
+        [
+          42.18771,
+          13.79931
+        ],
+        [
+          42.18978,
+          13.80045
+        ],
+        [
+          42.19095,
+          13.79821
+        ],
+        [
+          42.19213,
+          13.79585
+        ],
+        [
+          42.19133,
+          13.79324
+        ],
+        [
+          42.19255,
+          13.79121
+        ],
+        [
+          42.19337,
+          13.78864
+        ],
+        [
+          42.19488,
+          13.78701
+        ],
+        [
+          42.19685,
+          13.78644
+        ]
+      ]
+    }
+  ]
+}

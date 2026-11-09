@@ -1,0 +1,26 @@
+{
+  "edition": "2027-portugal-morocco",
+  "status": "route per ASO statement of 2026-10-30; stage-level detail from one secondary source, to cross-check against dakar.com's updated route page and ASO's route PDF",
+  "dates": ["2027-01-09", "2027-01-23"],
+  "totals": { "km": 7824, "specialKm": 4341 },
+  "note": "Leg types: special = timed stage (BeamNG rallyStage), transfer = timed liaison (rallyRoadSection), ferry = teleport leg (no driving; the player is moved to the far port), rest = no event. Coordinates are lat/lon, filled in as the legs are authored.",
+  "legs": [
+    { "id": "P",   "date": "2027-01-09", "type": "special",  "where": "Loule/Faro loop (Algarve Stadium)",       "specialKm": 29,  "totalKm": 129 },
+    { "id": "S1",  "date": "2027-01-10", "type": "special",  "where": "Loule/Faro",                              "specialKm": 100, "totalKm": 300 },
+    { "id": "T1",  "date": "2027-01-10", "type": "transfer", "where": "Algarve -> southern Spain -> Mediterranean port" },
+    { "id": "F1",  "date": "2027-01-10", "type": "ferry",    "where": "Mediterranean port (Spain) -> Nador (Morocco), overnight" },
+    { "id": "T2",  "date": "2027-01-11", "type": "transfer", "where": "Nador -> Bouarfa bivouac",                "totalKm": 590 },
+    { "id": "S2",  "date": "2027-01-12", "type": "special",  "where": "Bouarfa loop (Rekkam plateau)",           "specialKm": 390, "totalKm": 490 },
+    { "id": "S3",  "date": "2027-01-13", "type": "special",  "where": "Bouarfa loop",                            "specialKm": 410, "totalKm": 490 },
+    { "id": "S4",  "date": "2027-01-14", "type": "special",  "where": "Bouarfa -> Zagora (via Merzouga)",        "specialKm": 490, "totalKm": 750 },
+    { "id": "S5",  "date": "2027-01-15", "type": "special",  "where": "Zagora loop (Erg Chegaga)",               "specialKm": 365, "totalKm": 540 },
+    { "id": "S6",  "date": "2027-01-16", "type": "special",  "where": "Zagora -> Agadir (Erg Chegaga)",          "specialKm": 365, "totalKm": 760 },
+    { "id": "R",   "date": "2027-01-17", "type": "rest",     "where": "Agadir" },
+    { "id": "S7",  "date": "2027-01-18", "type": "special",  "where": "Agadir -> Smara",                         "specialKm": 500, "totalKm": 790 },
+    { "id": "S8",  "date": "2027-01-19", "type": "special",  "where": "Smara -> marathon refuge (Dakhla lagoon)", "specialKm": 355, "totalKm": 525 },
+    { "id": "S9",  "date": "2027-01-20", "type": "special",  "where": "marathon refuge -> Smara",                "specialKm": 390, "totalKm": 625 },
+    { "id": "S10", "date": "2027-01-21", "type": "special",  "where": "Smara loop",                              "specialKm": 470, "totalKm": 560 },
+    { "id": "S11", "date": "2027-01-22", "type": "special",  "where": "Smara -> Marrakech (incl. Plage Blanche)", "specialKm": 455, "totalKm": 1035 },
+    { "id": "S12", "date": "2027-01-23", "type": "special",  "where": "Marrakech loop (finish)",                 "specialKm": 22,  "totalKm": 240 }
+  ]
+}

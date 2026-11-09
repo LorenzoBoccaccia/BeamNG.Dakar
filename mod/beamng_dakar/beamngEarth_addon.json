@@ -1,0 +1,11 @@
+{
+  "options": [
+    {
+      "key": "groundShaping",
+      "label": "Shape the ground along the stages",
+      "type": "bool",
+      "default": true,
+      "help": "While a loop runs, the ground under each special stage is levelled to the road in memory (the original ground comes back when the loop stops). The BeamNG.Dakar window has the same switch."
+    }
+  ]
+}

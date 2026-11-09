@@ -107,3 +107,25 @@ def test_the_editions_geometry_files_carry_structures_that_lie_on_their_line():
                 assert s["kind"] in ("bridge", "tunnel") and 0 <= s["from"] < s["to"] <= geo["lengthM"] + 20, (ed, fn, s)
                 assert s["from"] >= last - 1e-6                                   # (in order, apart)
                 last = s["to"]
+
+
+def test_a_tunnel_under_or_beside_the_line_is_a_stretch_the_ground_shaping_leaves_alone():
+    # the A25's tunnel under the hill beside the Svolte di Popoli's stage road: a tunnel way that crosses the line at an angle, 100 m of
+    # the line within reach of its axis (30 m either side of the crossing: the line is not on it), and a culvert is not a tunnel
+    cross = way(2, [(500, -200), (500, 200)], highway="motorway", tunnel="yes", layer="-1")
+    culvert = way(3, [(100, -200), (100, 200)], tunnel="culvert", highway="residential")
+    far = way(4, [(800, 60), (800, 300)], highway="motorway", tunnel="yes")             # (60 m off the line: out of reach)
+    got = structures.tunnels_beside(LINE, [road_plain(), cross, culvert, far])
+    assert len(got) == 1 and got[0]["way"] == 2
+    assert abs(got[0]["from"] - (500 - structures.TUNNEL_NEAR_M)) <= structures.SAMPLE_M
+    assert abs(got[0]["to"] - (500 + structures.TUNNEL_NEAR_M)) <= structures.SAMPLE_M
+    assert structures.spans(LINE, [road_plain(), cross]) == []                          # (it is not the road the line runs on)
+    assert structures.tunnels_beside(LINE, [road_plain()]) == []
+
+
+def test_the_popoli_stage_records_the_a25_tunnel_it_passes_over():
+    geo = json.load(open(os.path.join(ROOT, "editions", "svolte-di-popoli", "geometry", "ss1.json"), encoding="utf-8"))
+    beside = geo["tunnelsBeside"]
+    # the A25 tunnel's west portal and the hill over its first stretch: 650 to 735 m, and again at 907 to 997 m, along the stage line
+    assert any(t["from"] <= 660 and t["to"] >= 730 and t["way"] == 29382955 for t in beside)
+    assert any(t["from"] <= 910 and t["to"] >= 990 and t["way"] == 29382785 for t in beside)

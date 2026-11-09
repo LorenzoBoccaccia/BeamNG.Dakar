@@ -156,7 +156,10 @@ written to its files:
   edition are fetched one after the other, and a GPS route the player sets meanwhile takes over from it.
 - **The ground shaping** (`shape.lua`): while the loop runs, every terrain block Earth brings in (taps on
   `terrain.load` and `terrain.swap`) is looked at along the stage and changed, in memory, only where the elevation data
-  has a defect the road does not, and nowhere else: every other cell of the road is as Earth made it. Earth paints
+  has a defect the road does not, and nowhere else: every other cell of the road is as Earth made it. Only the stage
+  road is worked on: its surface (5.5 m either side of the line: the road's half width, `legs.ROAD_WIDTH` / 2, and half a metre)
+  and the ground directly under it, with a taper of 6 m to blend into the ground beside it (it was 6.5 m and 12 m, 37 m of
+  ground for a 10 m road); other roads, a tunnel's arch and holes, embankments and verges beyond the taper are Earth's. Earth paints
   the asphalt into the ground photo and draws the centre and edge lines as a mesh 2.5 cm over its own ground, which does
   not follow ours, so every cell we moved buried the lines or left them floating. What is fixed, found on the game's
   own ground under the curated line (its plan; not its heights, which are the offline terrain data and stood 10 m above
@@ -165,11 +168,24 @@ written to its files:
     than 2.5 m over the line, as wide as a road (the same height 2 m to either side of the line), that does not continue
     from the ground at either end: the A25 over the Svolte di Popoli's SR17): the line there is the straight line
     between the ground beyond, up to 8 m of change;
-  - a big spike or dip on the line (curate.despike: 2 m or more off the straight line between the points k steps either
-    side of it, median over k = 1 to 4, 10 m steps: a steady grade, a crest of 4 percent change per 10 m and a hillside are
-    not; an edition sets its own in legs.json, `"shaping": { "spikeM": 3 }` is the Popoli stage's, whose hairpins are cut
-    into a steep hillside the curated line is a few metres off), with the points within 15 m of it (the taper): the
-    line there is the straight line between the points beyond, up to 4 m of change;
+  - a big spike on the line (curate.despike with `BUMPS_ONLY`: a point 2 m or more over the straight line between the points
+    k steps either side of it, median over k = 1 to 4, 10 m steps: a steady grade, a crest of 4 percent change per 10 m and a
+    hillside are not; an edition sets its own in legs.json, `"shaping": { "spikeM": 3 }` is the Popoli stage's, whose
+    hairpins are cut into a steep hillside the curated line is a few metres off), with the points within 15 m of it (the
+    taper): the line there is the straight line between the points beyond, up to 4 m of change. Only a point above that
+    line is a defect: the elevation data errs upward along a road (a roof, a canopy, a viaduct's deck baked in), and a dip
+    is a sag the road dips into and climbs out of (the Popoli stage's, at 796 m: a 20 percent climb out of it), or a gully
+    under a deck whose collider is not in the game yet or is out of the rays' reach. Filling one raised the ground 4 m
+    under Earth's road lines. The rim of a dip stands over the line across it too, and is no spike either (a deeper dip
+    within reach of a point rules it out);
+  - nothing beside a tunnel: Earth builds a tunnel's tube and portals (a colliding mesh) and shapes the terrain for them
+    (holes at the mouths, the ground raised over a low arch), so the points of the line within 30 m of a tunnel's axis
+    are left as Earth made them, and the stretches next to them are not worked on. Which: the geometry's
+    `"tunnelsBeside": [{"from": m, "to": m, "way": id}]`, metres along the line, from OpenStreetMap's tunnel ways
+    (`tools/structures.py <edition>` writes them with the structures; the Popoli stage's A25 tunnel at 651 to 736 m and 907
+    to 997 m), and at run time the tubes Earth has built in the game now (the points along their axes that Earth's
+    `ambience.tunnelLights()` gives, when it has that call). The data is what is certain: Earth's tubes are known only for
+    the road tiles loaded;
   - the ground at either end of a deck, met to the deck's top: a bridge OpenStreetMap tags (`structures` in the
     geometry), and a deck of our own road the game's colliders show, tagged or not (the culvert after the Popoli
     underpass). The latter is a run of points under a wide collider (as wide as a road) that stands over the ground, one point
@@ -185,7 +201,7 @@ written to its files:
   - a fix that asks for more than 4 m is not cut off at the cap, which leaves a plateau with the defect's steep sides: its whole
     delta is scaled to the cap and the remainder is spread over the stretch (the log says it).
   A fix is a delta, not a flat core: a cell moves by `w * (the line's fixed height - the ground under the line)` at the
-  nearest point of the line, `w` the falloff (1 within 6.5 m of the line, a smoothstep to 0 over the next 12 m), so the cross
+  nearest point of the line, `w` the falloff (1 within 5.5 m of the line, a smoothstep to 0 over the next 6 m), so the cross
   slope and camber and what Earth graded stay and only the defect goes. The delta falls to 0 at the first point past the
   taper, so nothing steps where it starts. Only the stretches fixed and their tapers are worked on (the log says how many,
   of what kind, how long, and the largest change; the cells of the road core that moved 4 cm or more are the lines
@@ -196,6 +212,13 @@ written to its files:
   in the same terms, is shown top right on the Earth level and logged once a second (`where:` lines, `hud.lua`): world
   x, y, z, latitude and longitude, the ground under the car, the speed, and the nearest line with the metres along it, so a
   screenshot can be matched to the shaping's log.
+  A menu start does the stage's ground before the stage starts, behind the loading screen (it is held anyway): when the
+  launch is reached and the terrain block is in, the ground along the stages is shaped as far as the block reaches, with
+  10 ms of work a frame instead of 1.5, and the launch waits for it (20 s at most, and never into the screen's own 420 s
+  watchdog: with less than 30 s left of it the shaping is left to the drive). The log says how much of the line the block
+  held, the stretches fixed, the cells, the work and the time (`stage ground shaped behind the loading screen`). The loop's
+  start sets the same stages again, which is not a second job; a block that arrives later is shaped as it comes, as before,
+  and the pre-shaped ground goes back when the launch gives up. An in-game start has no loading screen and shapes as the car goes.
   It is done again after every commit and anchor change; the originals go back when the loop stops, the switch in the
   BeamNG.Dakar window (or the add-on's option) is turned off, or the extension unloads, when the block is still the one shaped
   (Earth's next commit restores everything by itself anyway). The work is spread over frames (1.5 ms of height maths a frame

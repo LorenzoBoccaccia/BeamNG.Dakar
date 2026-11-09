@@ -455,7 +455,7 @@ end
 -- are on both sides) and the median of those departures: a steady grade is no departure at all and a crest or a hillside only a little
 -- (4 percent change of grade per 10 m, the limit of a road, is 1.3 m), where the median-of-heights test of M.profile misses a spike
 -- smaller than the climb's step and flags the points at a profile's end on a steep climb. The ground shaping (shape.lua) uses it, on
--- the game's own ground under the line, to find the defects of the elevation data it fixes, with a lower SPIKE_M; it
+-- the game's own ground under the line, to find the defects of the elevation data it fixes, with a lower SPIKE_M (and BUMPS_ONLY); it
 -- used to smooth that profile whole (M.profile), which moved every cell of the road and stranded Earth's road lines.
 function M.despike(H, opts)
   local o = {}
@@ -465,11 +465,25 @@ function M.despike(H, opts)
   local out = {}
   for i = 1, n do out[i] = H[i] end
   local flagged, isSpike, worst = {}, {}, 0
+  local dv = {}
   for i = 2, n - 1 do
     local devs = {}
     for k = 1, math.min(o.SPIKE_HALF, i - 1, n - i) do devs[#devs + 1] = H[i] - (H[i - k] + H[i + k]) / 2 end
-    local dev = median(devs)
-    if abs(dev) > o.SPIKE_M then
+    dv[i] = median(devs)
+  end
+  for i = 2, n - 1 do
+    local dev = dv[i]
+    local hit = abs(dev) > o.SPIKE_M
+    if hit and o.BUMPS_ONLY then
+      -- A point below the line between its neighbours is a sag, a gully or a hollow, which a road crosses and the elevation data does
+      -- not get wrong the way it gets a roof or a deck wrong: only a point above it is a defect. And the rim of a dip stands above the
+      -- line across the dip, by less than the dip's floor is under it: a point with a deeper dip within reach is that rim, not a bump.
+      hit = dev > 0
+      for j = math.max(2, i - o.SPIKE_HALF), math.min(n - 1, i + o.SPIKE_HALF) do
+        if hit and dv[j] < -dev then hit = false end
+      end
+    end
+    if hit then
       isSpike[i] = true
       flagged[#flagged + 1] = i
       if abs(dev) > worst then worst = abs(dev) end

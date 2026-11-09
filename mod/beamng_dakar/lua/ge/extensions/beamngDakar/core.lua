@@ -916,6 +916,15 @@ local function getShaper()
       return car
     end,
     ground = terrainHeightAt,
+    -- the tunnels Earth has built in the game now: points along their axes (Earth's sound spaces, its tunnel lights), the ground
+    -- beside them is Earth's own (the portals' holes, the arch raised over a low tube). Nil when Earth has none or has no such call.
+    tunnels = function()
+      local am = earthModule('ambience')
+      if not (am and type(am.tunnelLights) == 'function') then return nil end
+      local ok, list = pcall(am.tunnelLights)
+      if ok and type(list) == 'table' and #list > 0 then return list end
+      return nil
+    end,
     -- the top of the static colliders (a bridge deck) above a point on the line
     deck = function(x, y, hint)
       if not (castRayStatic and vec3) then return nil end
@@ -946,8 +955,19 @@ local function shapeLines()
         local sp = curate.spanAt(r, i)
         if sp then skip[i] = sp.tagged and 'tagged' or true end
       end
+      -- (tunnelsBeside: metres along the line within reach of a tunnel's axis, tools/structures.py; Earth built the tunnel and shaped the ground for it)
+      local keep
+      local beside = st.geometry[leg.id] and st.geometry[leg.id].tunnelsBeside
+      if beside and r.s then
+        keep = {}
+        for i = 1, #w do
+          for _, t in ipairs(beside) do
+            if r.s[i] and r.s[i] >= t.from and r.s[i] <= t.to then keep[i] = true; break end
+          end
+        end
+      end
       local cfg = st.edition.shaping
-      lines[#lines + 1] = { pts = w, skip = skip, spikeM = cfg and cfg.spikeM }
+      lines[#lines + 1] = { pts = w, skip = skip, keep = keep, spikeM = cfg and cfg.spikeM }
     end
   end
   return lines
@@ -959,8 +979,59 @@ local function shapeRefresh()
   if scenery.active then s:setLines(shapeLines()) else s:stop() end
 end
 
+-- The ground is shaped along the stages while the loading screen is still up, before the stage starts, as far ahead as the terrain
+-- block Earth has loaded reaches: the drive then has little left to shape around the car (the blocks that come later are shaped as
+-- they arrive, as ever). The screen is held anyway, so a frame gives the work PRESHAPE_BUDGET_MS instead of the usual 1.5; it is waited
+-- for PRESHAPE_MAX_S at most, and never into the loading screen's own watchdog (LOADING_MAX_S).
+local PRESHAPE_BUDGET_MS = 10
+local PRESHAPE_MAX_S = 20
+local PRESHAPE_MARGIN_S = 30
+
+-- Starts the shaping of the stages on the block that is in (a launch behind the loading screen). Returns true when there is work to wait for.
+local function preshapeBegin()
+  if not st.shapeOn or not st.loadingSince then return false end
+  local left = LOADING_MAX_S - (st.clock - st.loadingSince) - PRESHAPE_MARGIN_S
+  if left <= 1 then
+    ownLog('W', 'stage ground not shaped behind the loading screen: it has been held for ' .. string.format('%.0f s', st.clock - st.loadingSince))
+    return false
+  end
+  local lines = shapeLines()
+  if not lines or #lines == 0 then return false end
+  local s = getShaper()
+  s:setLines(lines)
+  s:update(PRESHAPE_BUDGET_MS)                  -- (the job begins now: no block, or none of the stage in it, is told at once)
+  local state = s:status().state
+  if not (s:busy() or state == 'shaped' or state == 'nothing to shape') or state == 'no terrain block' then
+    ownLog('I', 'stage ground not shaped behind the loading screen: ' .. tostring(state))
+    return false
+  end
+  st.preshape = { since = st.clock, maxS = math.min(PRESHAPE_MAX_S, left), jobs = s:status().jobs }
+  ownLog('I', string.format('shaping the stage ground behind the loading screen (%.0f s at most)', st.preshape.maxS))
+  return true
+end
+
+-- Is the shaping behind the loading screen through (or out of time)? Says what was done, once.
+local function preshapeSettled()
+  local ps = st.preshape
+  if not ps then return true end
+  local s = shaper
+  local took = st.clock - ps.since
+  local busy = s and s:busy()
+  if busy and took < ps.maxS then return false end
+  st.preshape = nil
+  if not s then return true end
+  local sh = s:status()
+  if busy then
+    ownLog('W', string.format('the stage ground is not all shaped after %.0f s behind the loading screen: the rest is shaped as the car comes to it', took))
+  end
+  ownLog('I', string.format('stage ground shaped behind the loading screen: %.0f m of the stage line in the terrain block, %d stretches fixed (%.0f m with the tapers), ' ..
+    '%d cells written, %.1f ms of work in %d frames, %.1f s of loading screen%s', sh.coveredM or 0, sh.stretches or 0, sh.fixLength or 0, sh.cells or 0,
+    sh.ms or 0, sh.frames or 0, took, busy and ' (not finished)' or ''))
+  return true
+end
+
 local function shapeTick()
-  if shaper then shaper:update() end
+  if shaper then shaper:update(st.preshape and PRESHAPE_BUDGET_MS or nil) end
   if reclipper then reclipper:update() end
 end
 
@@ -1420,7 +1491,10 @@ local function launch()
   releaseLoadingScreen('the loop starts (its own fade takes over)')
   local ok, err = pcall(gameplay_missions_missionManager.startWithFade, mission, settings, pending and pending.startingOptions)
   st.passThrough = false
-  if not ok then ownLog('E', 'the mission manager refused the start: ' .. tostring(err)) end
+  if not ok then
+    ownLog('E', 'the mission manager refused the start: ' .. tostring(err))
+    st.ourStart = false
+  end
 end
 
 -- The route for the current anchor, then the game's start.
@@ -1428,6 +1502,7 @@ function M.runLaunch()
   local ok, err = pcall(launch)
   if not ok then ownLog('E', 'launch failed: ' .. tostring(err)) end
   releaseLoadingScreen('the launch ended without starting the loop')     -- (no-op when launch let it go)
+  if not st.ourStart and not scenery.active then pcall(shapeRefresh) end   -- (no loop: what was shaped behind the loading screen goes back)
 end
 
 -- The corridor prefetch of the edition's special stages (preload.lua): Earth's server fetches the whole
@@ -1466,10 +1541,14 @@ function M.launch()
   if not okC then ownLog('E', 'stage curation failed: ' .. tostring(errC)) end
   local okP, hold = pcall(startPreload)
   if not okP then ownLog('E', 'stage preload failed: ' .. tostring(hold)); hold = false end
-  if hold and st.loadingSince then
+  local okS, shaping = pcall(preshapeBegin)
+  if not okS then ownLog('E', 'shaping behind the loading screen failed: ' .. tostring(shaping)); shaping = false; st.preshape = nil end
+  if (hold or shaping) and st.loadingSince then
     st.preloadGate = { since = st.clock }
     st.phase = 'preload'
-    ownLog('I', string.format('the loading screen stays up until the stage corridor is fetched (at most %d s)', preload.CAP_S))
+    if hold then
+      ownLog('I', string.format('the loading screen stays up until the stage corridor is fetched (at most %d s)', preload.CAP_S))
+    end
     return
   end
   if hold then ownLog('I', 'the stage corridor is fetched in the background (no loading screen to hold)') end
@@ -1479,11 +1558,10 @@ end
 -- The loading-screen gate, each frame: the answers and progress, and the launch once the first stage is in (or gave up).
 local function preloadTick()
   local p = st.preload
-  if not p then return end
-  p:tick()
-  if st.preloadGate and p:gateOpen() then
+  if p then p:tick() end
+  if st.preloadGate and (not p or p:gateOpen()) and preshapeSettled() then
     st.preloadGate = nil
-    ownLog('I', 'the stage corridor is settled: launching')
+    if p then ownLog('I', 'the stage corridor is settled: launching') end
     M.runLaunch()
   end
 end
@@ -1496,7 +1574,8 @@ end
 -- Give up a launch that waits for the preload (the window's stop, the level ending).
 local function cancelPreloadGate(why)
   if not st.preloadGate then return end
-  st.preloadGate, st.pending = nil, nil
+  st.preloadGate, st.pending, st.preshape = nil, nil, nil
+  if not scenery.active then pcall(shapeRefresh) end
   if st.phase == 'preload' then st.phase = 'idle' end
   releaseLoadingScreen(why)
 end
@@ -1622,7 +1701,8 @@ function M.onUpdate(dt)
   if not okH and not st.shapeWarned then st.shapeWarned = true; ownLog('E', 'ground shaping failed: ' .. tostring(errH)) end
   local okP, errP = pcall(preloadTick)
   if not okP then
-    st.preloadGate, st.preload = nil, nil
+    st.preloadGate, st.preload, st.preshape = nil, nil, nil
+    if not scenery.active then pcall(shapeRefresh) end
     if st.phase == 'preload' then st.phase = 'idle' end
     releaseLoadingScreen('the stage preload failed')
     ownLog('E', 'stage preload failed: ' .. tostring(errP))

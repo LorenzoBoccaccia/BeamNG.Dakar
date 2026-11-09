@@ -6,13 +6,19 @@
 -- terrain: every cell of the road core we move buries the lines (raised) or leaves them floating (lowered). So the road is left
 -- exactly as Earth made it, every cell untouched, but for
 --   * the ground under an overpass, where the elevation data has the deck baked in as a ridge, and
---   * a big spike or dip on the road line, SPIKE_M or more off the line's own trend over a short window (curate.despike): a defect of
---     the data, not relief (a steep climb or a hillside is not one), and
+--   * a big spike on the road line, SPIKE_M or more over the line's own trend over a short window (curate.despike, bumps only): a defect
+--     of the data, not relief (a steep climb or a hillside is not one). A dip is never one: it is a sag the road dips into and climbs
+--     out of, or a gully under a deck the game's colliders do not show yet, and filling it left the road lines under the ground, and
 --   * the ground at either end of a deck, which is met to the deck's top with a smooth ramp that follows the road's ground beyond it, raising or
 --     cutting it: a span OpenStreetMap tags as
 --     a bridge, and a deck of our own road the game's colliders show (a wide collider whose top continues from the road at its ends, over a
 --     gully or a culvert OpenStreetMap does not tag). A narrow collider at road level is never the reason to move the ground (a
 --     retaining wall at a hairpin was taken for a deck).
+--   * and nothing beside a tunnel: Earth builds a tunnel's tube and portals and shapes the terrain for them (holes at the mouths, the ground
+--     raised over a low arch), so a point of the line near one (the geometry's `tunnelsBeside`, OpenStreetMap's tunnel ways, and the tubes
+--     Earth has made in the game now) is left as Earth made it.
+-- Only the stage road is worked on: its surface (CORE_M, the road's half width and a little) and the ground directly under it, with a taper
+-- (BLEND_M) just wide enough to blend into the ground beside; other roads, embankments and verges beyond that are Earth's.
 -- Where one of those is, the change is a delta, not a flat core: a cell is moved by w * (the line's fixed height - the ground under
 -- the line) at the nearest point of the line, w the falloff, so the road's cross slope and camber and what Earth graded are kept and
 -- only the defect is taken out. The delta ends in a taper along the line (TAPER_M). Only the stretches fixed and their tapers are
@@ -53,8 +59,8 @@ local curate = require('beamngDakar/curate')
 
 local M = {}
 
-M.CORE_M = 6.5              -- the road's half width (legs.ROAD_WIDTH / 2) and a margin: the whole delta of the line within this ...
-M.BLEND_M = 12              -- ... then eased (smoothstep) to nothing over this
+M.CORE_M = 5.5              -- the road's half width (legs.ROAD_WIDTH / 2) and half a metre: the whole delta of the line within this ...
+M.BLEND_M = 6               -- ... then eased (smoothstep) to nothing over this (it was 6.5 and 12: 37 m of ground moved for a 10 m road)
 M.LOG_STRETCHES = 12        -- the log names at most this many stretches fixed and colliders over the line
 M.EDGE_CELLS = 8            -- the block's rim is left alone (Earth's sunk edge ring and edge holes are there)
 M.BUDGET_MS = 1.5           -- the shaping work of one frame
@@ -68,6 +74,9 @@ M.SPIKE_M = 2.0             -- a point of the line is a spike when its ground is
                             -- cut on a steep hillside, where the curated line is a few metres off the road and the ground under it is the slope
                             -- beside it, is flagged by 1.5 m. The viaduct's ridge is an overpass fix of its own, not a spike. An edition may set
                             -- its own (legs.json: "shaping": { "spikeM": 2.5 })
+M.TUNNEL_KEEP_M = 30        -- a point of the line this near a tunnel's axis (Earth's portal holes and arch raise reach about 12 m from it, the shaping
+                            -- CORE_M + BLEND_M from the line, and the line's points are 10 m apart) is left alone, with its segments
+M.TUNNEL_POINT_M = 10       -- (the tubes Earth made in the game are known by points along their axes, 20 m apart at most: this much more for the gap)
 M.TAPER_M = 15              -- a fix ends in a taper along the line: the points within this of a spike are fixed with it (the delta
                             -- falls from the spike to the first point beyond, where it is 0)
 M.DECK_ABOVE_M = 2.5        -- ... and where a static collider stands this far above the ground on the line (a deck or an overpass)
@@ -142,10 +151,26 @@ end
 local E = {}
 E.__index = E
 
+-- A string that is the same for the same stretches (their points, the spans and the tunnels left alone, the edition's limit).
+local function linesKey(lines)
+  local out = {}
+  for _, line in ipairs(lines) do
+    out[#out + 1] = tostring(#line.pts) .. ':' .. tostring(line.spikeM)
+    for _, p in ipairs(line.pts) do out[#out + 1] = string.format('%.2f,%.2f', p[1], p[2]) end
+    for _, name in ipairs({ 'skip', 'keep' }) do
+      local t, ks = line[name], {}
+      for k, v in pairs(t or {}) do ks[#ks + 1] = tostring(k) .. '=' .. tostring(v) end
+      table.sort(ks)
+      out[#out + 1] = name .. ':' .. table.concat(ks, ',')
+    end
+  end
+  return table.concat(out, ';')
+end
+
 -- env: block() -> TerrainBlock or nil; now() -> ms (monotonic); clock() -> s (for the status and a car's speed);
 -- player() -> { x, y, speed (m/s, optional: else from the last two looks) } or nil;
 -- ground(x, y) -> the game's terrain height there or nil; deck(x, y) -> the top of the static colliders there or nil;
--- log(level, msg); vec3(x, y, z).
+-- tunnels() -> { { x, y }, ... } points along the axes of the tunnels Earth has built (optional); log(level, msg); vec3(x, y, z).
 function M.new(env)
   return setmetatable({
     env = env, enabled = true, lines = nil, gen = 0, dirty = false, rec = nil, job = nil, fresh = false,
@@ -158,7 +183,15 @@ end
 -- (skip[i]: the stretch from point i to i + 1 is a bridge or a tunnel). Replaces what was set; nil or {} for none.
 -- A block that came with its own unshaped ground and was not shaped yet (a swap whose frame was not known) is done at once.
 function E:setLines(lines)
-  self.lines = (lines and #lines > 0) and lines or nil
+  lines = (lines and #lines > 0) and lines or nil
+  local key = lines and linesKey(lines) or nil
+  -- (the same stages again, on a block already shaped for them or being shaped: the loop's start after the loading screen's shaping, an
+  -- anchor commit that did not move them: no second job, which would put the heights back and shape them again)
+  if key and key == self.linesKey and self.lines and (self.job or (self.rec and self.rec.gen == self.gen)) and not self.dirty then
+    self.lines = lines
+    return
+  end
+  self.lines, self.linesKey = lines, key
   self.dirty = self.lines ~= nil
   self.job = nil
   if self.dirty and self.fresh then self:shapeNow() end
@@ -187,7 +220,7 @@ end
 
 -- The loop is over: the heights go back and the lines are dropped.
 function E:stop()
-  self.lines, self.dirty, self.job = nil, false, nil
+  self.lines, self.linesKey, self.dirty, self.job = nil, nil, false, nil
 end
 
 function E:busy() return self.job ~= nil or self.dirty or (self.rec ~= nil and self.rec.n > 0 and not self:wanted()) end
@@ -543,10 +576,13 @@ local function plan(self, tb, info, off)
   local ymin, ymax = info.py + lo, info.py + info.n * info.sq - lo
   local cx, cy = self.carX, self.carY
   local S = { ax = {}, ay = {}, az = {}, dx = {}, dy = {}, dz = {}, l2 = {}, near = {}, ln = {}, s = {}, cap = {}, stop = {}, n = 0, cuts = {} }
-  local skipped = { span = 0, ground = 0, deck = 0, over = 0, pinned = 0 }
+  local skipped = { span = 0, ground = 0, deck = 0, over = 0, pinned = 0, tunnel = 0 }
   -- the stretches fixed: how many of each kind, their length along the line, the largest delta, and each one's place (list); what the
   -- colliders over the line were taken for (found: a deck left alone, a narrow one, ...), for the log
-  local fixes = { n = 0, length = 0, largest = 0, list = {}, found = {}, spread = 0, spreadMax = 0, ramps = {} }
+  local fixes = { n = 0, length = 0, largest = 0, list = {}, found = {}, spread = 0, spreadMax = 0, ramps = {}, covered = 0 }
+  -- the tubes of Earth's tunnels in the game now (points along their axes), for the points of the line beside one
+  local tunnelPts = env.tunnels and env.tunnels() or nil
+  local keepR2 = (M.TUNNEL_KEEP_M + M.TUNNEL_POINT_M) ^ 2
   local rim = M.EDGE_CELLS + 2
   local rayR2 = M.DECK_RAY_M * M.DECK_RAY_M
   -- how far the car is from segment k (squared: the nearest first), which begins at (ax, ay)
@@ -583,6 +619,20 @@ local function plan(self, tb, info, off)
             end
           end
         end
+      end
+    end
+    -- the points beside a tunnel (the geometry's tunnelsBeside, and the tubes in the game): the ground there is Earth's, as it made it
+    -- for the tunnel; the run of the line is broken at them like at a deck, and nothing of ours reaches them
+    local held = {}
+    for i, p in ipairs(pts) do
+      if G[i] then
+        local keep = line.keep and line.keep[i]
+        if not keep and tunnelPts then
+          for _, t in ipairs(tunnelPts) do
+            if (t[1] - p[1]) ^ 2 + (t[2] - p[2]) ^ 2 <= keepR2 then keep = true; break end
+          end
+        end
+        if keep then G[i], top[i], wide[i], held[i] = nil, nil, nil, true end
       end
     end
     -- along the line (m) at each point
@@ -651,8 +701,9 @@ local function plan(self, tb, info, off)
         if j > i then
           -- (a run that ends where the next point has no ground is cut by the block's edge: what is found within RUN_END_REACH_M of
           -- the cut may differ from what the block before found, so the car must be far from it, see shapeNow)
-          if i > 1 and not G[i - 1] then S.cuts[#S.cuts + 1] = { pts[i][1], pts[i][2] } end
-          if j < #pts and not G[j + 1] then S.cuts[#S.cuts + 1] = { pts[j][1], pts[j][2] } end
+          if i > 1 and not G[i - 1] and not held[i - 1] then S.cuts[#S.cuts + 1] = { pts[i][1], pts[i][2] } end
+          if j < #pts and not G[j + 1] and not held[j + 1] then S.cuts[#S.cuts + 1] = { pts[j][1], pts[j][2] } end
+          fixes.covered = fixes.covered + cum[j] - cum[i]
           for q = i, j do D[q] = 0 end
           -- the spikes, found on the ground with an overpass's ridge already taken out (it is a fix of its own)
           local H = {}
@@ -677,7 +728,7 @@ local function plan(self, tb, info, off)
           end
           local core, kind = {}, {}
           if j - i >= 2 then
-            local flagged = curate.despike(H, { SPIKE_M = line.spikeM or M.SPIKE_M })
+            local flagged = curate.despike(H, { SPIKE_M = line.spikeM or M.SPIKE_M, BUMPS_ONLY = true })
             for _, f in ipairs(flagged) do
               local q = i + f - 1
               local m = q
@@ -803,6 +854,7 @@ local function plan(self, tb, info, off)
       if inside then
         if line.skip and line.skip[i2] then skipped.span = skipped.span + 1
         elseif deck[i2] or deck[i2 + 1] then skipped.deck = skipped.deck + 1
+        elseif held[i2] or held[i2 + 1] then skipped.tunnel = skipped.tunnel + 1
         elseif not (D[i2] and D[i2 + 1]) then skipped.ground = skipped.ground + 1
         elseif abs(D[i2]) > 1e-9 or abs(D[i2 + 1]) > 1e-9 then          -- (only where there is something to fix: no other segment is worked on)
           local k = S.n + 1
@@ -1133,16 +1185,18 @@ local function finish(self, job)
     s.state = job.cells > 0 and 'shaped' or 'nothing to shape'
     s.structures = job.skipped
     s.stretches, s.fixLength, s.fixLargest = job.fixes.n, job.fixes.length, job.fixes.largest
+    s.coveredM, s.tunnelSegments = job.fixes.covered, job.skipped.tunnel
     -- (where the biggest change is, on the road's core or beside it, and what the cap held back)
     -- (only what is fixed is written, the rest of the road is as Earth made it)
     local f = job.fixes
     log(self, 'I', string.format('shaping: %d stretch%s of the line fixed (%d under an overpass, %d spike%s, %d deck end%s), %.0f m of it with the tapers, ' ..
       'largest change of the line %.1f m; %d cells written along %d segments in %d frames, %.1f ms, largest change %.1f m (%.1f m on the road core, ' ..
       'within %.1f m of the line); the ground asked for up to %.1f m (%.1f m on the core), %d cells held at %.1f m; ' ..
-      'left alone: %d span, %d deck, %d no-ground segments; %d segments under an overpass, %d deck ends met', f.n, f.n == 1 and '' or 'es',
+      'left alone: %d span, %d deck, %d no-ground segments; %d segments under an overpass, %d deck ends met; %.0f m of the line examined in the block, ' ..
+      '%d segments beside a tunnel left as Earth made them', f.n, f.n == 1 and '' or 'es',
       f.overpass or 0, f.spike or 0, (f.spike or 0) == 1 and '' or 's', f['deck end'] or 0, (f['deck end'] or 0) == 1 and '' or 's',
       f.length, f.largest, job.cells, job.S.n, job.frames, ms, job.maxChange, job.maxCore, M.CORE_M, job.wantedMax, job.wantedCore,
-      job.capped, M.MAX_CHANGE_M, job.skipped.span, job.skipped.deck, job.skipped.ground, job.skipped.over, job.skipped.pinned))
+      job.capped, M.MAX_CHANGE_M, job.skipped.span, job.skipped.deck, job.skipped.ground, job.skipped.over, job.skipped.pinned, f.covered, job.skipped.tunnel))
     -- (where each stretch is, in metres along its line and in the world, and what the colliders over the line were taken for:
     -- the 'deck ends' of a stage with no bridge were a collider the shaping took for a deck, and the log could not say where)
     reportRamps(self, job)
@@ -1527,7 +1581,8 @@ function E:status()
     wantedMax = live and live.wantedMax or s.wantedMax, wantedCore = live and live.wantedCore or s.wantedCore,
     capped = live and live.capped or s.capped, ms = s.ms, frames = s.frames, jobs = s.jobs, total = s.total,
     skipped = s.skipped, at = s.at, working = self.job ~= nil, syncCells = s.syncCells, syncMs = s.syncMs, deferred = s.deferred,
-    stretches = s.stretches or 0, fixLength = s.fixLength or 0, fixLargest = s.fixLargest or 0,
+    stretches = s.stretches or 0, fixLength = s.fixLength or 0, fixLargest = s.fixLargest or 0, coveredM = s.coveredM or 0,
+    tunnelSegments = s.tunnelSegments or 0,
     coreMoved = s.coreMoved or 0, linesStranded = (s.linesUp or 0) + (s.linesDown or 0),
   }
 end

@@ -27,7 +27,8 @@ a leg that does not run into the next one straight (a transfer that turns onto t
 the way the transfer came) has the join moved along the road, past the turn, and the geometry written to agree.
 
 A special's file also gets "structures": [{"from": m, "to": m, "kind": "bridge"|"tunnel", "way": id}], the bridge and tunnel ways its
-own road is on, metres along the line (tools/structures.py, from OpenStreetMap's tags).
+own road is on, metres along the line (tools/structures.py, from OpenStreetMap's tags), and "tunnelsBeside": [{"from": m, "to": m, "way": id}],
+the stretches within 30 m of the axis of a tunnel way (a tunnel under or beside the road: Earth builds its portals and shapes the ground for it).
 python tools/structures.py <edition> adds just those to files already made.
 
 Needs Pillow and numpy (and duckdb for parkingNear). Network: router.project-osrm.org, s3.amazonaws.com and overpass-api.de (read only).
@@ -161,9 +162,11 @@ def main():
             # the bridges and tunnels the stage's own road is on, from OpenStreetMap's tags: the ground shaping
             # leaves them alone and meets their ends (tools/structures.py)
             try:
-                found = structures.record(pts)
+                found, beside = structures.record_all(pts)
                 if found:
                     out["structures"] = found
+                if beside:
+                    out["tunnelsBeside"] = beside
             except Exception as e:                  # (no network: the file has none, and curate.lua finds spans from the profile)
                 print("%s: no structures (%s)" % (leg["id"], e), file=sys.stderr)
         if it["joinIn"] and it["joinIn"]["mode"] != "kept":

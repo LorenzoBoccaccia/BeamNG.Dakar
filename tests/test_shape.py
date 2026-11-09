@@ -188,7 +188,10 @@ def shape_it(lua):
     return lua.eval("runIdle(E)")
 
 
-def weight(d, core=6.5, blend=12.0):
+CORE, BLEND = 5.5, 6.0           # (shape.CORE_M and BLEND_M: the road's half width and half a metre, and the taper beside it)
+
+
+def weight(d, core=CORE, blend=BLEND):
     """The falloff, as the module defines it: 1 in the core, a smoothstep down to 0 at core + blend."""
     if d <= core:
         return 1.0
@@ -223,16 +226,16 @@ def test_a_spike_on_the_line_is_fixed_as_a_delta_that_keeps_the_cross_slope_and_
     assert d < -2.8                                                     # (a 3 m spike: the line comes down by it)
     # (grid conversion: the cell at world (x, y) is where the line says; heights are world heights whichever the convention)
     # the cells across the road, within the core, move by the same delta as the line: the cross slope and the spike's own shape across stay
-    for dy in (0, 1, 3, 5, 6):
+    for dy in (0, 1, 3, 5):
         for sign in (1, -1):
             assert world(lua, 100, sign * dy) - ground(100, sign * dy, bumps) == pytest.approx(d, abs=1e-6), (dy, sign)
     # through the blend: the delta moved by the weight of the distance (a change under MIN_CHANGE_M is not written)
-    for dy in range(7, 19):
+    for dy in range(6, 12):
         for sign in (1, -1):
             want = d * weight(dy) if abs(d * weight(dy)) >= lua.eval("shape.MIN_CHANGE_M") else 0.0
             assert world(lua, 100, sign * dy) - ground(100, sign * dy, bumps) == pytest.approx(want, abs=1e-6), (dy, sign)
     # beyond the blend: untouched
-    for dy in (19, 25, 40, -30):
+    for dy in (12, 25, 40, -30):
         assert world(lua, 100, dy) == pytest.approx(ground(100, dy, bumps), abs=1e-9)
     # the spike's top is on the line between its feet; the feet are fixed with it and the delta falls to 0 at the points 20 m beside it
     for x in (80, 120, 60, 140, 40, 200):
@@ -242,11 +245,12 @@ def test_a_spike_on_the_line_is_fixed_as_a_delta_that_keeps_the_cross_slope_and_
     deltas = [abs(world(lua, x, 0) - ground(x, 0, bumps)) for x in range(80, 101)]
     assert all(a <= b + 1e-9 for a, b in zip(deltas, deltas[1:]))        # (tapered: it grows to the spike, never a step)
     assert max(abs(b - a) for a, b in zip(deltas, deltas[1:])) < 0.35    # (no step: 0.3 m a metre of the line at most)
-    # nothing is written beyond the stretch fixed, its taper and the falloff: the deltas of the points from 80 to 120 m, 18.5 m round
+    # nothing is written beyond the stretch fixed, its taper and the falloff: the deltas of the points from 80 to 120 m, 11.5 m round
     x0, x1, y0, y1 = extent(lua)
-    assert 80 - 18.5 - 1 <= x0 and x1 <= 120 + 18.5 + 1 and -19.5 <= y0 and y1 <= 19.5
+    reach = CORE + BLEND
+    assert 80 - reach - 1 <= x0 and x1 <= 120 + reach + 1 and -reach - 1 <= y0 and y1 <= reach + 1
     st = lua.eval("E:status()")
-    assert st.state == "shaped" and st.cells > 1000
+    assert st.state == "shaped" and st.cells > 500
     assert st.maxChange == pytest.approx(-d, abs=1e-6)                   # the largest change: the delta on the line
     assert st.stretches == 1 and st.fixLargest == pytest.approx(-d, abs=1e-6) and st.at is not None
     assert lua.eval("TB.sets") == st.cells                               # (every cell written once, and only those)
@@ -303,10 +307,10 @@ def test_a_spike_beside_a_steep_climb_is_found_against_the_climb(lua):
 
 
 def test_the_road_is_never_moved_further_than_MAX_CHANGE_M(lua):
-    # a dip of the ground 10 m deep and 60 m long under the road: a defect of the data bigger than the cap, so the cap holds. It is held
-    # by spreading the change, not by cutting every cell off at the cap, which leaves a plateau with the dip's steep sides
+    # a ridge of the ground 10 m high and 60 m long on the road: a defect of the data bigger than the cap, so the cap holds. It is held
+    # by spreading the change, not by cutting every cell off at the cap, which leaves a plateau with the ridge's steep sides
     lua.execute("BUMPS = {}; GROUND_PLANE = GROUND; "
-                "GROUND = function(x, y) return GROUND_PLANE(x, y) - 10 * math.exp(-((x - 120) ^ 2) / 450) end")
+                "GROUND = function(x, y) return GROUND_PLANE(x, y) + 10 * math.exp(-((x - 120) ^ 2) / 450) end")
     setup(lua)
     shape_it(lua)
     cap = lua.eval("shape.MAX_CHANGE_M")
@@ -317,10 +321,10 @@ def test_the_road_is_never_moved_further_than_MAX_CHANGE_M(lua):
         assert abs(world(lua, x, 0) - g) <= cap + 1e-6, x
     assert lua.eval("logged('asked for more than the 4 m cap')") and lua.eval("logged('spread over the stretch')")
     assert not lua.eval("logged('road core was asked to move')")        # (no cell is cut off at the cap)
-    # the remainder is the dip's own shape, smaller: the road follows the plane's own height less 60 percent of the dip, with no step
-    for x in range(90, 160, 10):
-        dip = 10 * math.exp(-((x - 120) ** 2) / 450.0)
-        assert world(lua, x, 0) == pytest.approx(plane(x, 0) - dip * 0.6, abs=0.35), x
+    # the remainder is the ridge's own shape, smaller: the road follows the plane's own height plus 60 percent of the ridge, with no step
+    for x in range(110, 140, 10):
+        ridge = 10 * math.exp(-((x - 120) ** 2) / 450.0)
+        assert world(lua, x, 0) == pytest.approx(plane(x, 0) + ridge * 0.6, abs=0.35), x
 
 
 def test_the_box_handed_to_updateGrid_covers_every_changed_cell(lua):
@@ -337,7 +341,7 @@ def test_the_work_is_spread_over_frames_within_the_budget(lua):
     lua.execute("CLOCK_STEP = 0.3")                                 # a look at the clock costs 300 us: a frame does a few columns
     setup(lua)
     frames, worst = shape_it(lua)
-    assert frames > 15
+    assert frames > 10
     assert worst <= lua.eval("shape.URGENT_BUDGET_MS") + 3.0          # no frame much past the biggest budget it is given (a column and the plan over)
     # the frames after the urgent slice (the stretch within URGENT_M of the player) are held to the normal budget
     setup(lua)
@@ -399,7 +403,7 @@ def test_a_new_block_is_shaped_again_and_the_old_ones_originals_are_not_written_
     assert world(lua, 100, 0, "TB2") == pytest.approx(road(100) + 2, abs=TOL)     # (the new ground's height, not the old one's)
     d = spike_delta()
     o = ground(100, 12) + 2
-    assert world(lua, 100, 12, "TB2") == pytest.approx(o + d * weight(12), abs=1e-6)
+    assert world(lua, 100, 8, "TB2") == pytest.approx(ground(100, 8) + 2 + d * weight(8), abs=1e-6)
     sets2 = lua.eval("TB2.sets")
     lua.execute("E:stop()")
     shape_it(lua)
@@ -631,7 +635,7 @@ def test_an_overpass_above_the_line_does_not_stop_the_shaping_and_the_ridge_unde
     # as a delta: the cells across the road move by what the line moves, the cross slope and the ridge's fall across are Earth's
     d = world(lua, 120, 0) - lua.eval("GROUND(120, 0)")
     assert d == pytest.approx(-6, abs=0.15)
-    for dy in (-6, -3, 3, 6):
+    for dy in (-5, -3, 3, 5):
         assert world(lua, 120, dy) - lua.eval("GROUND(120, %d)" % dy) == pytest.approx(d, abs=1e-6)
     assert lua.eval("logged('1 stretch of the line fixed (1 under an overpass, 0 spikes, 0 deck ends)')")
     assert lua.eval("logged('segments under an overpass')")
@@ -639,7 +643,7 @@ def test_an_overpass_above_the_line_does_not_stop_the_shaping_and_the_ridge_unde
     assert lua.eval("logged('over the ground at ')") and lua.eval("logged('is an overpass: the road runs under it')")
     # the pad (20 m past the overpass's 100 to 140) is the stretch, and nothing is written past it and the falloff
     x0, x1, y0, y1 = extent(lua)
-    assert 70 - 18.5 - 1 <= x0 and x1 <= 170 + 18.5 + 1
+    assert 70 - CORE - BLEND - 1 <= x0 and x1 <= 170 + CORE + BLEND + 1
     assert world(lua, 190, 0) == pytest.approx(lua.eval("GROUND(190, 0)"), abs=1e-9)
     assert st.stretches == 1 and 3 < st.fixLength < 130
     # beyond the pad the ordinary 4 m cap holds
@@ -857,3 +861,115 @@ def test_an_engine_that_refuses_the_edit_switches_the_shaping_off_instead_of_fai
     lua.execute("for i = 1, 20 do E:update() end")
     assert len(lua.eval("LOGS")) == n                                  # (said once)
     assert lua.eval("TB.sets") == 0
+
+
+# The Svolte di Popoli SS1's sag at 740 to 890 m: the street dips to 283.7 m at 796 m and climbs 9 m in 50 m (20 percent), a dip and a climb
+# of the street itself (the geometry's raw heights, metres along -> z). Taken for a spike, the ground there was raised by 4 m (the stretch asked for
+# 4.7 m) over 780 to 859 m, under Earth's road lines. A sag is no defect of the elevation data: a road crosses it, and a gully under a
+# deck (whose collider is not in the game yet, or out of the rays' reach) looks the same.
+SS1_SAG = [(656, 286.42), (672, 286.46), (689, 286.22), (706, 285.85), (723, 285.32), (740, 284.94), (756, 284.4), (772, 283.97),
+           (788, 283.69), (796, 283.69), (801, 283.84), (806, 284.2), (810, 284.92), (814, 285.77), (819, 286.85), (823, 288.06),
+           (827, 289.25), (832, 290.42), (837, 291.58), (842, 292.41), (847, 292.95), (857, 293.69), (870, 294.62), (884, 295.57),
+           (894, 296.4), (905, 297.32), (924, 299.14), (943, 300.84)]
+
+
+def sag_ground(extra_dip=0.0, bump=0.0):
+    """Lua for GROUND along y = 0 (x is the metres along the stage): the raw heights, on the game's ground 3.8 m above them (the log's
+    readout at 739 m), a cross slope, and a gully `extra_dip` deeper at 800 m (the game's ground was 4.7 m under the stretch's chord, the raw line
+    2.7 m), or a `bump` on the climb."""
+    pts = ", ".join("{ %d, %.2f }" % p for p in SS1_SAG)
+    return ("SAG = { %s }; function GROUND(x, y) local z; for i = 1, #SAG - 1 do local a, b = SAG[i], SAG[i + 1]; "
+            "if x >= a[1] and x <= b[1] then z = a[2] + (b[2] - a[2]) * (x - a[1]) / (b[1] - a[1]) end end; "
+            "z = (z or SAG[#SAG][2]) + 3.8 + 0.05 * y; z = z - %r * math.exp(-((x - 800) ^ 2) / 200); "
+            "return z + %r * math.exp(-((x - 840) ^ 2 + y ^ 2) / 50) end" % (pts, extra_dip, bump))
+
+
+@pytest.mark.parametrize("extra_dip", [0.0, 2.0])
+def test_a_sag_the_road_dips_into_and_climbs_out_of_is_not_a_spike_and_not_one_cell_is_moved(lua, extra_dip):
+    lua.execute("BUMPS = {}; DECK = nil")                                  # (no collider seen over the line)
+    lua.execute(sag_ground(extra_dip))
+    setup(lua, line="roadLine(660, 940, 110)", px=630, py=-64, n=340)
+    lua.execute("PLAYER = { x = 600, y = 0, speed = 0 }")
+    lua.execute("E.lines[1].spikeM = 3")                                   # (the Popoli edition's own limit)
+    shape_it(lua)
+    assert lua.eval("TB.sets") == 0 and lua.eval("sameAs(TB, SNAP)") is True
+    st = lua.eval("E:status()")
+    assert st.stretches == 0 and st.cells == 0
+    assert lua.eval("logged('0 stretches of the line fixed')")
+
+
+def test_a_bump_on_that_climb_is_still_fixed_and_the_sag_beside_it_is_not_touched(lua):
+    lua.execute("BUMPS = {}; DECK = nil")
+    lua.execute(sag_ground(extra_dip=2.0, bump=5.0))
+    setup(lua, line="roadLine(660, 940, 110)", px=630, py=-64, n=340)
+    lua.execute("PLAYER = { x = 600, y = 0, speed = 0 }")
+    lua.execute("E.lines[1].spikeM = 3")
+    shape_it(lua)
+    assert lua.eval("E:status().stretches") == 1 and lua.eval("logged('1 spike')")
+    # the bump (at 840 m) comes down; the sag at 800 m is as it was, and so is the road before it
+    assert world(lua, 840, 0) < lua.eval("GROUND(840, 0)") - 3
+    for x in (680, 720, 760, 790, 800, 810):
+        assert world(lua, x, 0) == pytest.approx(lua.eval("GROUND(%d, 0)" % x), abs=1e-9), x
+
+
+# --- the ground beside a tunnel is Earth's (it builds the tube and portals and shapes the terrain for them) --------------------------
+
+def spiked_world(lua):
+    lua.execute("BUMPS = { { 120, 0 }, { 220, 0 } }")        # (3 m spikes on the line at 120 m, beside a tunnel, and at 220 m, away from it)
+
+
+def untouched_between(lua, x0, x1):
+    return all(world(lua, x, y) == pytest.approx(lua.eval("GROUND(%r, %r)" % (float(x), float(y))), abs=1e-9)
+               for x in range(x0, x1 + 1, 2) for y in range(-12, 13, 3))
+
+
+def test_a_stretch_the_geometry_says_is_beside_a_tunnel_is_left_as_earth_made_it_and_the_spike_beyond_it_is_fixed(lua):
+    spiked_world(lua)
+    setup(lua, line="(function() local l = roadLine(40, 260, 110); l.keep = { [8] = true, [9] = true, [10] = true }; return l end)()")
+    shape_it(lua)
+    st = lua.eval("E:status()")
+    assert st.stretches == 1 and st.tunnelSegments >= 2                      # (only the spike at 220 m is fixed)
+    assert untouched_between(lua, 95, 145)                                     # the spike at 120 m, the ground round it, the segments either side
+    assert world(lua, 220, 0) == pytest.approx(plane(220, 0), abs=0.3)         # ... and the other one is taken out as ever
+    assert lua.eval("logged('segments beside a tunnel left as Earth made them')")
+
+
+def test_the_tubes_earth_has_built_in_the_game_are_left_alone_too(lua):
+    spiked_world(lua)
+    lua.execute("TUBES = { { 110, 0, 100 }, { 130, 0, 100 } }")
+    setup(lua, line="roadLine(40, 260, 110)")
+    lua.execute("E.env.tunnels = function() return TUBES end; E:setLines({ roadLine(40, 260, 110) })")
+    shape_it(lua)
+    assert untouched_between(lua, 85, 155)
+    assert world(lua, 220, 0) == pytest.approx(plane(220, 0), abs=0.3)
+    assert lua.eval("E:status().tunnelSegments") >= 2
+    # no tunnel in the game: the same stretch is fixed
+    lua.execute("TUBES = {}")
+    setup(lua, line="roadLine(40, 260, 110)")
+    lua.execute("E.env.tunnels = function() return TUBES end; E:setLines({ roadLine(40, 260, 110) })")
+    shape_it(lua)
+    assert world(lua, 120, 0) == pytest.approx(plane(120, 0), abs=0.3)
+
+
+def test_the_same_stages_set_again_on_a_shaped_block_are_not_a_new_job(lua):
+    lua.execute("BUMPS = { { 100, 0 } }")
+    setup(lua)
+    shape_it(lua)
+    sets, jobs = lua.eval("TB.sets"), lua.eval("E:status().jobs")
+    lua.execute("E:setLines({ roadLine(40, 216, 110) })")                        # (a new table, the same stretches)
+    assert not lua.eval("E:busy()")
+    shape_it(lua)
+    assert lua.eval("TB.sets") == sets and lua.eval("E:status().jobs") == jobs
+    lua.execute("E:setLines({ roadLine(40, 216, 111) })")                        # (the heights of the line are not what the ground is shaped to)
+    assert not lua.eval("E:busy()")
+    lua.execute("E:setLines({ roadLine(40, 226, 110) })")                        # (another line: shaped again)
+    assert lua.eval("E:busy()")
+    shape_it(lua)
+    assert lua.eval("E:status().jobs") == jobs + 1 and lua.eval("TB.sets") >= sets
+
+
+def test_the_shaping_reaches_the_road_and_a_short_taper_and_nothing_wider(lua):
+    # (the user's rule: only the road the player races on, and the ground under it: a 10 m road, half a metre of margin, and a taper to blend in)
+    assert lua.eval("shape.CORE_M") == CORE and lua.eval("shape.BLEND_M") == BLEND
+    assert CORE == pytest.approx(lua.eval("require('beamngDakar/legs').ROAD_WIDTH") / 2 + 0.5)
+    assert CORE + BLEND < 12

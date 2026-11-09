@@ -79,7 +79,7 @@ def test_the_swap_writes_only_the_cells_of_the_stretches_fixed(lua, speed):
     x0, x1, y0, y1 = lua.eval("extent(TB2, SNAP2)")
     spikes = [bx for bx, _ in SPIKES]
     for x in (x0, x1):
-        assert any(bx - 20 - 18.5 - 1 <= x <= bx + 20 + 18.5 + 1 for bx in spikes), x
+        assert any(bx - 20 - 11.5 - 1 <= x <= bx + 20 + 11.5 + 1 for bx in spikes), x
     assert -19.5 <= y0 and y1 <= 19.5
     # ... and every cell written is within reach of one of them (none between: the road between the spikes is Earth's, as made)
     assert lua.eval("(function() local n = 0; for _, k in ipairs(changedCells(TB2, SNAP2)) do "
@@ -91,8 +91,8 @@ def test_the_swap_writes_only_the_cells_of_the_stretches_fixed(lua, speed):
 
 def test_the_speed_comes_from_the_players_position_when_the_env_has_no_velocity(lua):
     swap_world(lua, 0.0)
-    lua.execute("PLAYER = { x = 250, y = 0 }; CLOCK = 0; E.env.clock = function() return CLOCK end; E:car()")
-    lua.execute("CLOCK = 1; PLAYER = { x = 280, y = 0 }")
+    lua.execute("PLAYER = { x = 250, y = 0 }; CLOCK = 10; E.env.clock = function() return CLOCK end; E:car()")
+    lua.execute("CLOCK = 11; PLAYER = { x = 280, y = 0 }")
     assert lua.eval("select(3, E:car())") == pytest.approx(30.0)
 
 
@@ -113,7 +113,7 @@ def test_the_stretch_shaped_at_once_costs_a_few_milliseconds_on_the_stub(lua):
     cost = lua.eval("COST")
     st = lua.eval("E:status()")
     print("sync: %d cells in %.1f ms (the plan included)" % (st.syncCells, cost))
-    assert st.syncCells > 800                              # (9358 cells and 24.6 ms at 35 m/s before: only the spike's cells)
+    assert st.syncCells > 500                              # (9358 cells and 24.6 ms at 35 m/s before: only the spike's cells)
     assert cost < 250                                      # (generous for a loaded machine on plain Lua; LuaJIT measured 7 ms)
 
 
@@ -161,7 +161,7 @@ def test_a_rebase_in_progress_has_its_stages_set_after_the_swap_and_then_shapes_
     lua.execute("CURRENT = TB2; E:blockChanged(true)")
     assert lua.eval("TB2.sets") == 0
     lua.execute("E:setLines({ roadLine(0, 400, 110) })")
-    assert lua.eval("TB2.sets") > 1000                    # shaped at the car in the setLines call
+    assert lua.eval("TB2.sets") > 500                     # shaped at the car in the setLines call
     assert md(lua, "TB, TB2, 250, 0, 35") < 0.005
 
 
@@ -299,7 +299,7 @@ def test_the_largest_change_is_logged_on_the_road_core_and_anywhere_and_the_core
         assert abs(world(lua, x, y) - lua.eval("GROUND(%r, %r)" % (float(x), float(y)))) <= cap + 1e-6
     # (and the change across the road is continuous: no step where the cap starts to hold)
     ch = [world(lua, 100, y) - lua.eval("GROUND(100, %d)" % y) for y in range(-14, 15)]
-    assert max(abs(b - a) for a, b in zip(ch, ch[1:])) < 0.8      # (the falloff of 6 m over 12 m: 0.75 m a metre at its steepest)
+    assert max(abs(b - a) for a, b in zip(ch, ch[1:])) < 1.2      # (the falloff of 4 m over 6 m: 1.0 m a metre at its steepest)
 
 
 def test_a_gentle_road_is_not_held_by_the_cap_and_logs_no_warning(lua):

@@ -71,6 +71,7 @@ local st = {
   anchor = nil,             -- the current Earth anchor (a geodesy Anchor)
   edition = nil, geometry = nil, closures = nil, truth = nil,
   loaded = {},              -- edition id -> { edition, geometry, closures }: every edition read so far
+  markersWaiting = {},      -- mission markers whose ground was not loaded when they were placed (placeOnGround)
   phase = 'idle',           -- idle | teleporting | settling | running
   launchAt = nil,
   rebase = nil,             -- { xf, before } between phase 1 and the anchor commit of a rebase
@@ -1613,17 +1614,51 @@ local function moveStart(mission, x, y, z)
   end
 end
 
+-- A marker stands on the game's ground, not at the route data's height: the two differ (0.4 m under the ground at the
+-- Svolte di Popoli's service park, a few metres elsewhere), and a marker under it is not seen, nor entered (the game's
+-- start check measures the distance in 3D). Where the ground is not loaded yet (a far edition, a block still coming) the
+-- marker keeps the data's height and waits in st.markersWaiting; missionsTick puts it down once the ground is there.
+local function placeOnGround(mission, x, y, z)
+  local gz = groundAt(x, y, z)
+  moveStart(mission, x, y, gz or z)
+  if not gz then
+    st.markersWaiting[#st.markersWaiting + 1] = { mission = mission, x = x, y = y, z = z, frame = st.anchor }
+  end
+end
+
+local function groundWaitingMarkers()
+  local moved = 0
+  for i = #st.markersWaiting, 1, -1 do
+    local w = st.markersWaiting[i]
+    if w.mission.dakarFrame ~= w.frame then
+      table.remove(st.markersWaiting, i)                -- (placed again since, or built again by the game)
+    else
+      local gz = groundAt(w.x, w.y, w.z)
+      if gz then
+        moveStart(w.mission, w.x, w.y, gz)
+        table.remove(st.markersWaiting, i)
+        moved = moved + 1
+      end
+    end
+  end
+  if moved > 0 then
+    if gameplay_rawPois and gameplay_rawPois.clear then gameplay_rawPois.clear() end
+    ownLog('I', string.format('%d mission marker%s put on the ground (loaded there now)', moved, moved == 1 and '' or 's'))
+  end
+end
+
 -- The loops' start triggers (where the game puts a mission's marker) stand on their service parks in the current frame,
 -- so they move with every anchor change; not while a loop runs (launch put its trigger on the real ground).
 placeTrigger = function()
   if st.phase == 'running' or not (st.anchor and gameplay_missions_missions) then return end
+  st.markersWaiting = {}
   -- every edition's loop has its marker on its own service park, not only the one in use
   for _, id in ipairs(editionIds()) do
     local c = loadCached(id)
     local mission = c and gameplay_missions_missions.getMissionById(loopMissionId(c.edition))
     if mission and mission.startTrigger then
       local lat, lon, h = servicePark(c.edition, c.geometry)
-      moveStart(mission, st.anchor:geodeticToWorld(lat, lon, h))
+      placeOnGround(mission, st.anchor:geodeticToWorld(lat, lon, h))
     end
     -- every leg's own mission (a liaison or a special stage) has its marker on the time control that opens it, the leg's
     -- first point (TC0 for the first liaison, TC1 for SS1, ...); their info.json says 0, 0, 0, the world's origin
@@ -1632,7 +1667,7 @@ placeTrigger = function()
       local p = g and g.points and g.points[1]
       local lm = p and gameplay_missions_missions.getMissionById('beamng_earth/' .. missionType(leg) .. '/' .. missionName(c.edition, leg))
       if lm and lm.startTrigger then
-        moveStart(lm, st.anchor:geodeticToWorld(p[1], p[2], p[3]))
+        placeOnGround(lm, st.anchor:geodeticToWorld(p[1], p[2], p[3]))
       end
     end
   end
@@ -1665,6 +1700,7 @@ local function missionsTick()
       .. (mission and 'found' or 'still missing'))
   end
   if mission and st.anchor and mission.dakarFrame ~= st.anchor then placeTrigger() end
+  if st.markersWaiting[1] and st.phase ~= 'running' then groundWaitingMarkers() end
 end
 
 function M.status()

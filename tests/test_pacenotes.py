@@ -103,6 +103,42 @@ def test_a_hairpin_to_the_right(lua, pn):
     assert abs(c["angle"] - 180) < 12
 
 
+def test_a_wide_sweeping_bend_is_not_a_hairpin(lua, pn):
+    # 150 degrees on a 60 m circle (the first bend of the Svolte di Popoli climb): a long number, not a name
+    corners, _ = scan(lua, pn, road(("s", 300), ("r", 60, 150), ("s", 300)))
+    assert len(corners) == 1
+    c = corners[0]
+    assert c["descriptor"] is None and c["severity"] == 4
+    assert abs(c["angle"] - 150) < 12 and 50 < c["radius"] < 70
+
+
+def test_the_hairpin_names_are_earned_by_the_radius(lua, pn):
+    def descriptor(radius, degrees=170):
+        corners, _ = scan(lua, pn, road(("s", 300), ("l", radius, degrees), ("s", 300)))
+        assert len(corners) == 1
+        return corners[0]["descriptor"]
+    assert descriptor(6) == "tightHairpin"
+    assert descriptor(12) == "hairpin"
+    assert descriptor(21) == "openHairpin"
+    assert descriptor(30) is None and descriptor(60) is None      # as turned, but a wide circle
+    assert descriptor(12, 100) is None or descriptor(12, 100) == "square"     # a small circle, but not a U-turn
+
+
+def test_the_radius_is_the_circle_the_game_fits(lua, pn):
+    # the game's circle through the corner's two ends and its middle: the radius of the arc, on any of them
+    for radius, degrees in ((15, 120), (40, 90), (90, 60), (150, 45)):
+        corners, _ = scan(lua, pn, road(("s", 300), ("l", radius, degrees), ("s", 300)))
+        assert abs(corners[0]["radius"] - radius) < 0.1 * radius, (radius, degrees, corners[0]["radius"])
+
+
+def test_the_summary_names_the_corners_the_notebook_calls(lua, pn):
+    pts = road(("s", 200), ("l", 25, 90), ("s", 100), ("r", 12, 180), ("s", 200))
+    corners, _ = scan(lua, pn, pts)
+    line = pn.summary(lua.table(*corners), 1000)
+    assert line.startswith("2 corners called") and "1 by name" in line
+    assert pn.summary(lua.table(), 1000) == "no corners"
+
+
 def test_severity_follows_the_radius(lua, pn):
     def severity(radius, degrees):
         corners, _ = scan(lua, pn, road(("s", 300), ("l", radius, degrees), ("s", 300)))

@@ -460,13 +460,14 @@ M.carFacingDeg = carFacingDeg
 
 -- Everything for an edition at an anchor: { files = { [path under the mission folders] = table },
 -- placement = loopPlacement, lengths = { [leg id] = metres }, corners = { [special leg id] = the corners its notebook calls },
+-- noteSummaries = one log line per special about its notebook (pacenotes.summary),
 -- joins = M.joins (with the leg ids as fromId / toId), markers = every control's heading against its road (M.probeLines) }.
 -- `missionDirOf(leg)` names a leg's mission folder.
 -- `curated` (curate.lua): { [special leg id] = a curated line }; a special with one is built from it (the
 -- race path, the driveline and the pace notes all from the same cleaned line the ground is shaped to), else from its
 -- source geometry.
 function M.materialize(edition, geometry, anchor, missionDirOf, zBias, curated)
-  local files, lengths, notes, markers = {}, {}, {}, {}
+  local files, lengths, notes, markers, summaries = {}, {}, {}, {}, {}
   local wl = {}
   for i, leg in ipairs(edition.legs) do
     local g = geometry[leg.id]
@@ -500,6 +501,7 @@ function M.materialize(edition, geometry, anchor, missionDirOf, zBias, curated)
       files[dir .. '/rally/notebooks/' .. M.NOTEBOOK .. '.notebook.json'], notes[leg.id] = pacenotes.notebook(wpts)
     end
     lengths[leg.id] = length(wpts)
+    if notes[leg.id] then summaries[#summaries + 1] = leg.id .. ': ' .. pacenotes.summary(notes[leg.id], lengths[leg.id]) end
   end
   -- the first leg may start in a parking lot (geometry servicePark.lead, tools/fetch_route.py): the car's way to TC0 in it
   local lot = geometry[edition.legs[1].id].servicePark
@@ -507,7 +509,8 @@ function M.materialize(edition, geometry, anchor, missionDirOf, zBias, curated)
   local placement = M.loopPlacement(wl[1], edition.serviceStallBackM, lead)
   placement.facing = carFacingDeg(placement.rot)      -- (the car's real front, as the game turns the stall's orientation)
   placement.road = headingDeg(lead and dirAlong(lead, false) or dirAlong(wl[1], false))
-  return { files = files, placement = placement, lengths = lengths, corners = notes, joins = joins, markers = markers }
+  return { files = files, placement = placement, lengths = lengths, corners = notes, joins = joins, markers = markers,
+    noteSummaries = summaries }
 end
 
 return M

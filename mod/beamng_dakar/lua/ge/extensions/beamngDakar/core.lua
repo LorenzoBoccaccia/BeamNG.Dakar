@@ -1482,6 +1482,7 @@ local function launch()
   end
   local res, err = legs.materialize(st.edition, st.geometry, st.anchor, missionDirOf, bias, curated)
   if not res then return ownLog('E', 'materialize failed: ' .. tostring(err)) end
+  for _, line in ipairs(res.noteSummaries or {}) do ownLog('I', 'pace notes ' .. line) end
   for path, data in pairs(res.files) do
     if not jsonWriteFile(path, data, true) then return ownLog('E', 'could not write ' .. path) end
   end

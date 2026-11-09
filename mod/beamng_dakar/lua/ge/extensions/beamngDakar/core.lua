@@ -4,10 +4,10 @@
 -- It loads after BeamNG.Earth and changes nothing in it. It taps functions Earth calls through module tables:
 --   beamngEarth/rebase.moveVehicles(xf, geodesy)   phase 1 of a rebase: the cars move, xf is the whole frame change
 --   beamngEarth/mpanchor.announceOwn(lat, lon)     every anchor commit (teleport or rebase), after the world is in place
---   beamngEarth/terrain.load / .swap               a new terrain block is in (the ground shaping, shape.lua, GitHub #41)
---   beamngEarth/gps.onRouteDownload(msg)           the server's corridor prefetch progress (preload.lua, GitHub #41)
+--   beamngEarth/terrain.load / .swap               a new terrain block is in (the ground shaping, shape.lua)
+--   beamngEarth/gps.onRouteDownload(msg)           the server's corridor prefetch progress (preload.lua)
 -- Each tap calls the original first/last and never lets an error of ours into Earth's rebase.
--- What Earth 1.9.0's modding API (beamngEarth_api) offers goes through it instead (earthapi.lua, GitHub #51): the
+-- What Earth 1.9.0's modding API (beamngEarth_api) offers goes through it instead (earthapi.lua): the
 -- player's position, the teleport, the GPS, the messages on screen and the add-on's options; Earth 1.8.2 has none of
 -- it and gets the same from its internals. The taps above and the other internals have no API equivalent.
 --
@@ -53,11 +53,11 @@ local TAPS = {
   { module = 'beamngEarth/rebase',   fn = 'moveVehicles', before = 'onRebaseBegin' },
   { module = 'beamngEarth/mpanchor', fn = 'announceOwn',  after = 'onAnchor' },
   -- a terrain block's new heights are in (Earth's load = importMaps, swap = a .ter file): what we wrote to the old data is
-  -- gone, and the stage corridor is shaped again on the new (GitHub #41)
+  -- gone, and the stage corridor is shaped again on the new
   -- (optional: without them the loop runs as before, no shaping and no preload progress)
   { module = 'beamngEarth/terrain',  fn = 'load', result = 'onTerrainLoaded', optional = true },
   { module = 'beamngEarth/terrain',  fn = 'swap', result = 'onTerrainSwapped', optional = true },
-  -- the corridor prefetch's progress, which Earth shows on its map (GitHub #41)
+  -- the corridor prefetch's progress, which Earth shows on its map
   { module = 'beamngEarth/gps',      fn = 'onRouteDownload', after = 'onRouteDownload', optional = true },
   -- the mission list starts a loop through these two; ours is held until the route exists (interceptStart)
   { global = 'gameplay_missions_missionManager', fn = 'startWithFade', intercept = 'interceptStart' },
@@ -70,15 +70,15 @@ local st = {
   clock = 0,
   anchor = nil,             -- the current Earth anchor (a geodesy Anchor)
   edition = nil, geometry = nil, closures = nil, truth = nil,
-  loaded = {},              -- edition id -> { edition, geometry, closures }: every edition read so far (GitHub #40)
+  loaded = {},              -- edition id -> { edition, geometry, closures }: every edition read so far
   phase = 'idle',           -- idle | teleporting | settling | running
   launchAt = nil,
   rebase = nil,             -- { xf, before } between phase 1 and the anchor commit of a rebase
   adapt = false,
-  shapeOn = true,           -- the transient ground shaping along the stages (the window's switch, GitHub #41)
+  shapeOn = true,           -- the transient ground shaping along the stages (the window's switch)
   rebases = 0,
   bias = 0,                -- the metres the loop's heights are moved to the game's ground, measured at the last launch
-  preloadGate = nil,        -- { since }: a menu start's launch waits for the stage corridor prefetch (GitHub #41)
+  preloadGate = nil,        -- { since }: a menu start's launch waits for the stage corridor prefetch
 }
 
 local function ownLog(level, msg) log(level, logTag, msg) end
@@ -152,7 +152,7 @@ local function ensureTaps()
   return all
 end
 
--- The driveline's heights (GitHub #66). The game builds the road line the loop measures and tracks from drivelineSpline.json
+-- The driveline's heights. The game builds the road line the loop measures and tracks from drivelineSpline.json
 -- and sets every point's height from the terrain block (zSnap.conformSplineGeometry). Earth's block covers a couple of
 -- kilometres round the car; beyond it the terrain answers the block's base height, a constant hundreds of metres under a
 -- mountain road. The race nodes, the start positions and the pace notes keep the heights of the data, so each of them the
@@ -214,7 +214,7 @@ local function loadEdition(id)
     if not g then return nil, 'no geometry for leg ' .. leg.id .. ' (run tools/fetch_route.py)' end
     geometry[leg.id] = g
   end
-  -- where the side roads of a special stage are closed off (tools/stage_closures.py, GitHub #33); optional: an edition
+  -- where the side roads of a special stage are closed off (tools/stage_closures.py); optional: an edition
   -- without the files just has no closures
   local closures = {}
   for _, leg in ipairs(edition.legs) do
@@ -224,7 +224,7 @@ local function loadEdition(id)
 end
 
 -- An edition is read once and kept: the mission list, the window and the start triggers of every edition's loop ask for
--- them again and again (GitHub #40: a second edition must not cost the first its start marker).
+-- them again and again (a second edition must not cost the first its start marker).
 local function loadCached(id)
   local c = st.loaded[id]
   if c then return c end
@@ -235,7 +235,7 @@ local function loadCached(id)
   return c
 end
 
--- The curated line of each special stage of the current edition (curate.lua, GitHub #41), made once per edition: the
+-- The curated line of each special stage of the current edition (curate.lua), made once per edition: the
 -- source line cleaned of spurs, zigzags and profile spikes and held to road-like grades. Everything a special is built
 -- from (driveline, race path, pace notes, props, the ground shaping) uses it; the source geometry stays the truth the
 -- lat/lon came from. A line that cannot be curated stays as the source. Returns { [leg id] = curate.line result }.
@@ -297,7 +297,7 @@ local function editionIds()
   return ids
 end
 
--- Where an edition's service park is: where the car starts in the lot (GitHub #55: servicePark.spawn of its first leg's
+-- Where an edition's service park is: where the car starts in the lot (servicePark.spawn of its first leg's
 -- geometry), else the first leg's first point (the current edition unless one is given).
 local function servicePark(edition, geometry)
   local g = (geometry or st.geometry)[(edition or st.edition).legs[1].id]
@@ -372,7 +372,7 @@ end
 
 -- A main menu start keeps the game's loading screen up (our own request tag: it stays while any tag holds it) from the
 -- click until the loop's own start fade, so the level load, Earth's first place, the teleport to the service park, the
--- terrain and the roads all happen behind it (GitHub #25: no freeroam in between). Let go when the loop starts, when
+-- terrain and the roads all happen behind it (no freeroam in between). Let go when the loop starts, when
 -- the start gives up, and by the watchdog in onUpdate.
 local LOADING_TAG = 'beamngDakar'
 local LOADING_MAX_S = 420
@@ -498,7 +498,7 @@ local SCENERY_RECHECK_M = 400        -- after the player moved this far: look ag
 local SCENERY_EVERY_S = 0.5
 local scenery = { objs = {}, active = false, dirty = false, centre = nil, anchor = nil, worldByLeg = nil, bias = nil,
   defs = nil, checked = -10,
-  -- the roads props are kept off (GitHub #59): the game's navgraph and our own stage and transfer road, and a version that
+  -- the roads props are kept off: the game's navgraph and our own stage and transfer road, and a version that
   -- counts the changes of either, to check the props again
   roads = { graph = nil, own = nil, graphV = 0, builtV = -1, ownFor = nil, version = 0, nodeCount = nil, countedAt = -10 },
   roadLogged = {},
@@ -533,7 +533,7 @@ local function groundAt(x, y, hint)
 end
 M.groundAt = groundAt
 
-local PROP_SNAP_M = 400            -- a prop this close to the player is put on the real ground (GitHub #49)
+local PROP_SNAP_M = 400            -- a prop this close to the player is put on the real ground
 local PROP_SNAP_MIN_M = 0.2          -- (and not touched for less)
 
 local function setPropPose(o, x, y, z, yaw)
@@ -543,7 +543,7 @@ end
 
 -- A prop made far from the player gets no ground: the terrain there is not loaded, and it stands at the terrain data's
 -- height plus the last difference seen, which floated or sank props by metres (the Svolte di Popoli data is ~10 m above
--- the game's ground at the stage start, GitHub #49). It is marked as not on the ground yet, and propSnapTick puts it on
+-- the game's ground at the stage start). It is marked as not on the ground yet, and propSnapTick puts it on
 -- the ground once the player is close. A prop made with the ground known, close to the player, is done at once.
 local function makeProp(p, car)
   local gz = groundAt(p.x, p.y, p.z)
@@ -563,7 +563,7 @@ local function makeProp(p, car)
 end
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- No props on roads (GitHub #59): the game's navgraph (map.getMap().nodes, built by Earth from the roads it streams, a few tiles
+-- No props on roads: the game's navgraph (map.getMap().nodes, built by Earth from the roads it streams, a few tiles
 -- at a time) and our own stage and transfer road are the roads (roadcheck.lua); a prop whose footprint is within a road's half
 -- width and a margin of one is not made, or deleted when the roads came later. The closure tapes stand across side roads on
 -- purpose and have no footprint (props.footprint).
@@ -628,7 +628,7 @@ local function roadSkipLog(p, hit, what)
 end
 
 -- A prop that does a job (the start and finish boards, the sensors, the time control boards, the tower, the cones: props.pushable) found
--- on a road is not dropped (GitHub #61: the first run deleted the start's boards and sensors, the navgraph having the SR17 5 m wide):
+-- on a road is not dropped (the first run deleted the start's boards and sensors, the navgraph having the SR17 5 m wide):
 -- it is pushed out along the road's normal until its footprint clears the road and the margin, at most props.PUSH_MAX_M. Returns the new
 -- x, y and how far, or nil (not pushable, or no push clears it: then it goes like the decorations).
 local function roadPush(p, z)
@@ -746,7 +746,7 @@ local function sceneryReconcile()
     for _, leg in ipairs(st.edition.legs) do scenery.worldByLeg[leg.id] = legs.toWorld(legPoints(leg), st.anchor) end
   end
   if not scenery.defs then
-    -- the split checkpoints' boards stand where legs.raceNodes puts the splits in the race path (GitHub #37)
+    -- the split checkpoints' boards stand where legs.raceNodes puts the splits in the race path
     local splits = {}
     for _, leg in ipairs(st.edition.legs) do
       local list = {}
@@ -759,14 +759,14 @@ local function sceneryReconcile()
   end
   local want = {}
   local placed = props.place(scenery.defs, scenery.worldByLeg)
-  -- the closures across the side roads of the special stages (#33): the same kind of prop, from lat/lon per anchor
+  -- the closures across the side roads of the special stages: the same kind of prop, from lat/lon per anchor
   if scenery.sitesFor ~= st.closures then
     scenery.sites, scenery.sitesFor = props.closureSites(st.edition, st.closures), st.closures
   end
   for _, p in ipairs(props.placeClosures(scenery.sites, function(pts) return legs.toWorld(pts, st.anchor) end)) do
     placed[#placed + 1] = p
   end
-  -- the service booth beside the car's spot in the lot (GitHub #57): gazebos, tables and tools from the first leg's geometry
+  -- the service booth beside the car's spot in the lot: gazebos, tables and tools from the first leg's geometry
   if scenery.boothFor ~= st.geometry or scenery.boothEdition ~= st.edition then
     scenery.booth, scenery.boothFor, scenery.boothEdition = props.boothSites(st.edition, st.geometry), st.geometry, st.edition
   end
@@ -778,7 +778,7 @@ local function sceneryReconcile()
     local r = p.radius or (p.far and LANDMARK_RADIUS_M or SCENERY_RADIUS_M)
     if dx * dx + dy * dy <= r * r then want[p.id] = p end
   end
-  -- not on a road (GitHub #59); the ground of a prop within reach of the player is known, which tells a bridge over it
+  -- not on a road; the ground of a prop within reach of the player is known, which tells a bridge over it
   local dead = nil
   for id, p in pairs(want) do
     local ob = scenery.objs[id]
@@ -825,10 +825,10 @@ local function sceneryTick()
 end
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- Ground shaping (shape.lua, GitHub #41): while the loop is on, the terrain block's heights along the curated special
+-- Ground shaping (shape.lua): while the loop is on, the terrain block's heights along the curated special
 -- stages are changed, in memory, only where the elevation data has a defect the road does not (the ridge under an overpass, a big
--- spike or dip on the line, the ground at a deck's end: GitHub #63) and by no more than shape.MAX_CHANGE_M; everywhere else the road is
--- as Earth made it (its lines are a mesh over its own ground, GitHub #61). Again for every block Earth brings in (its load / swap
+-- spike or dip on the line, the ground at a deck's end: ) and by no more than shape.MAX_CHANGE_M; everywhere else the road is
+-- as Earth made it (its lines are a mesh over its own ground). Again for every block Earth brings in (its load / swap
 -- are tapped). The stages' world points are made again for every anchor; the originals go back when the loop stops.
 -- The curated line's heights (curate.lua) are not what the ground is shaped to: the ground is Earth's, the heights are the offline data.
 
@@ -853,7 +853,7 @@ local function terrainHeightAt(x, y)
   return nil
 end
 
--- The DecalRoads of Earth's road group over ground the shaping changed are cut to it again (reclip.lua, GitHub #61).
+-- The DecalRoads of Earth's road group over ground the shaping changed are cut to it again (reclip.lua).
 local shaper, reclipper
 local function getReclipper()
   if reclipper then return reclipper end
@@ -903,7 +903,7 @@ local function getShaper()
     now = newClock(),
     clock = function() return st.clock end,
     -- the player's car, and its speed: the shaping leaves the ground round a moving car alone and shapes the stretch round it at once
-    -- at a new block (GitHub #59)
+    -- at a new block
     player = function()
       local veh = getPlayerVehicle and getPlayerVehicle(0)
       local p = veh and v3(veh:getPosition()) or nil
@@ -941,7 +941,7 @@ local function shapeLines()
       local w = legs.toWorld(r.points, st.anchor, st.bias)
       local skip = {}
       -- ('tagged': OpenStreetMap says it is a bridge; the ground at its ends is met to the deck, which a span the profile alone found is not:
-      -- GitHub #65. The edition may set the spike limits of the shaping, legs.json "shaping": { "spikeM": 2.5 })
+      -- . The edition may set the spike limits of the shaping, legs.json "shaping": { "spikeM": 2.5 })
       for i = 1, #w - 1 do
         local sp = curate.spanAt(r, i)
         if sp then skip[i] = sp.tagged and 'tagged' or true end
@@ -967,7 +967,7 @@ end
 -- Earth put a new block's heights in (terrain.load = importMaps, terrain.swap = a .ter file; the tap hands over the
 -- original's first result): what we wrote to the old data is gone with it, so the stage is shaped again on the new.
 -- The tap runs in the same Lua call as Earth's swap or load, so what blockChanged shapes at the car is in before the next physics
--- step sees the new block (GitHub #59). During a rebase or a teleport the stages are not yet in the new block's frame (the anchor
+-- step sees the new block. During a rebase or a teleport the stages are not yet in the new block's frame (the anchor
 -- commit that follows sets them): shapeRefresh shapes the stretch at the car then.
 local function blockChanged()
   local stale = st.rebase ~= nil or st.phase == 'teleporting'
@@ -984,7 +984,7 @@ function M.setShaping(on)
 end
 
 -- The add-on's options (Earth 1.9.0: Settings > Add-ons > Options, declared in beamngEarth_addon.json at the top of the
--- add-on's zip, GitHub #51): read once Earth has them (onUpdate), and again whenever the player saves them. The
+-- add-on's zip): read once Earth has them (onUpdate), and again whenever the player saves them. The
 -- window's switch stays what it was, for Earth 1.8.2 and the unpacked install.
 local function applyOptions(values)
   if type(values) == 'table' and type(values.groundShaping) == 'boolean' then M.setShaping(values.groundShaping) end
@@ -998,7 +998,7 @@ local function shapeStatusText()
   local sh = shaper and shaper:status()
   if not sh then return 'Ground: no terrain block seen yet' end
   local ago = sh.at and string.format('%.0f s ago', st.clock - sh.at) or 'not yet'
-  -- (GitHub #63: the road is Earth's own but where a defect of the data is fixed: how many stretches that is)
+  -- (the road is Earth's own but where a defect of the data is fixed: how many stretches that is)
   return string.format('Ground: %s%s; %d stretch%s fixed, %d cells, largest change %.1f m, last %s', sh.enabled and '' or 'switched off, ',
     sh.state, sh.stretches, sh.stretches == 1 and '' or 'es', sh.cells, sh.maxChange, ago)
 end
@@ -1086,7 +1086,7 @@ function M.setAdapt(on) st.adapt = on and true or false; return st.adapt end
 -- The controls (TC_in / TC_out, SS_start_line / SS_stop_control) and the race nodes are written at the terrain data's
 -- height (plus the difference measured at the start): Earth has no ground far from the player and no height query
 -- for a far place. Once the player is within GROUND_SNAP_M of one and Earth has the ground there, it is put on that
--- ground, in the live race path, once per anchor (GitHub #31).
+-- ground, in the live race path, once per anchor.
 local GROUND_SNAP_M = 400
 local GROUND_SNAP_EVERY_S = 1.0
 local GROUND_SNAP_MIN_M = 0.2
@@ -1157,7 +1157,7 @@ end
 -- The main menu's mission list (missionTiles -> missionManager.startWithLoadingLevel) for one of our loops. The stock
 -- way loads the level at the level select's spawn (Earth's random place, another continent), spawns the mission car at
 -- (0, 0) before any ground is there and runs the whole loop in that spot: no car, no terrain, a stopped mission
--- (GitHub #23). Instead: the level loads as freeroam (as its own tile does, with the spawn point the player picked),
+--. Instead: the level loads as freeroam (as its own tile does, with the spawn point the player picked),
 -- and once Earth has its first anchor and the player, the start teleports to the service park and starts the loop
 -- there (M.start; the list's settings, nil from the menu: the mission's defaults). Returns true when it holds the call.
 function M.interceptLevelStart(mission, userSettings, level, startedFrom)
@@ -1223,7 +1223,7 @@ end
 local im
 local adaptPtr, shapePtr
 
--- Where the car is (GitHub #72): sampled every hud.PERIOD_S, logged, and drawn top right every frame (an imgui window is
+-- Where the car is: sampled every hud.PERIOD_S, logged, and drawn top right every frame (an imgui window is
 -- drawn each frame or it is gone). The lines are the curated stages and liaisons, as the shaping numbers them.
 local function hudLines()
   if not (st.anchor and st.edition and st.geometry) then return nil end
@@ -1284,7 +1284,7 @@ local function drawWindow()
     for _ in pairs(scenery.objs) do n = n + 1 end
     im.Text('Props standing: ' .. n .. (scenery.bias and string.format('   ground offset %.1f m', scenery.bias) or ''))
     if st.phase == 'idle' or st.phase == 'running' then
-      -- the edition the service park and the buttons are for (GitHub #40); not changed under a loop that is on
+      -- the edition the service park and the buttons are for; not changed under a loop that is on
       local ids = editionIds()
       if #ids > 1 and not scenery.active then
         for _, id in ipairs(ids) do
@@ -1324,7 +1324,7 @@ local function drawWindow()
     end
     adaptPtr[0] = st.adapt
     if im.Checkbox('Move rally data at rebases (experiment)', adaptPtr) then st.adapt = adaptPtr[0] end
-    -- the transient ground shaping along the stages (shape.lua, GitHub #41): off puts the original ground back
+    -- the transient ground shaping along the stages (shape.lua): off puts the original ground back
     shapePtr = shapePtr or im.BoolPtr(st.shapeOn)
     shapePtr[0] = st.shapeOn
     if im.Checkbox('Shape the ground along the stages', shapePtr) then M.setShaping(shapePtr[0]) end
@@ -1370,8 +1370,8 @@ local function launch()
   else
     ownLog('W', 'no ground found under the start point (the terrain is not loaded there yet); the route stays at the terrain data height')
   end
-  st.bias = bias                               -- (the route's heights only: the ground is Earth's own, shaped only at a defect, GitHub #63)
-  -- the curated stages (GitHub #41): what was found and changed, per special
+  st.bias = bias                               -- (the route's heights only: the ground is Earth's own, shaped only at a defect)
+  -- the curated stages: what was found and changed, per special
   local curated = curatedLines()
   local c = st.loaded[st.edition.edition]
   for _, leg in ipairs(st.edition.legs) do
@@ -1389,12 +1389,12 @@ local function launch()
   -- the loop's own positions (the service stall, the start trigger) are world numbers in the current frame too; the car is
   -- put there by the mission, half a metre above the ground (the route already lies on it).
   local pl = res.placement
-  -- (the car starts in the parking lot with TC0 a few metres ahead of it, GitHub #55; without a lot the stall stands back
-  -- from TC0, GitHub #27: on the game's ground there, else at the height of the data)
+  -- (the car starts in the parking lot with TC0 a few metres ahead of it; without a lot the stall stands back
+  -- from TC0: on the game's ground there, else at the height of the data)
   local gzStall = groundAt(pl.pos[1], pl.pos[2], pl.pos[3])
   ownLog('I', string.format('%s %.0f m before TC0, ground %s', pl.inLot and 'the car starts in the lot,' or 'service stall',
     pl.backM or 0, gzStall and string.format('%.1f m', gzStall) or 'not found (height of the data)'))
-  -- every control's heading against the road's, the joins and the spawn (GitHub #55)
+  -- every control's heading against the road's, the joins and the spawn
   for _, line in ipairs(legs.probeLines(res)) do ownLog('I', line) end
   pl.pos = { pl.pos[1], pl.pos[2], (gzStall or pl.pos[3]) + 0.5 }
   mission.missionTypeData.serviceStallPos = pl.pos
@@ -1430,7 +1430,7 @@ function M.runLaunch()
   releaseLoadingScreen('the launch ended without starting the loop')     -- (no-op when launch let it go)
 end
 
--- The corridor prefetch of the edition's special stages (preload.lua, GitHub #41): Earth's server fetches the whole
+-- The corridor prefetch of the edition's special stages (preload.lua): Earth's server fetches the whole
 -- corridor of a start-to-finish route into its caches. The stages are asked for one after the other (a newer route
 -- supersedes the older on the server). Returns true while the first stage's corridor is not in.
 local function startPreload()
@@ -1521,7 +1521,7 @@ end
 
 -- A mission's start moved. The game copies startTrigger.pos into its locations cache the first time it reads a mission
 -- (missions.lua getLocations), and the marker, the big map and the start check all read that copy: moving startTrigger
--- alone left them where info.json put them, 0, 0, 0 (GitHub #1). The copy moves too. The mission is tagged with the frame
+-- alone left them where info.json put them, 0, 0, 0. The copy moves too. The mission is tagged with the frame
 -- it was placed in: a mission object without the tag is one the game has built again from info.json (missionsTick).
 local function moveStart(mission, x, y, z)
   mission.startTrigger.pos = { x, y, z }
@@ -1538,7 +1538,7 @@ end
 -- so they move with every anchor change; not while a loop runs (launch put its trigger on the real ground).
 placeTrigger = function()
   if st.phase == 'running' or not (st.anchor and gameplay_missions_missions) then return end
-  -- every edition's loop has its marker on its own service park, not only the one in use (GitHub #40)
+  -- every edition's loop has its marker on its own service park, not only the one in use
   for _, id in ipairs(editionIds()) do
     local c = loadCached(id)
     local mission = c and gameplay_missions_missions.getMissionById(loopMissionId(c.edition))
@@ -1547,7 +1547,7 @@ placeTrigger = function()
       moveStart(mission, st.anchor:geodeticToWorld(lat, lon, h))
     end
     -- every leg's own mission (a liaison or a special stage) has its marker on the time control that opens it, the leg's
-    -- first point (TC0 for the first liaison, TC1 for SS1, ...); their info.json says 0, 0, 0, the world's origin (GitHub #76)
+    -- first point (TC0 for the first liaison, TC1 for SS1, ...); their info.json says 0, 0, 0, the world's origin
     for _, leg in ipairs(c and c.edition.legs or {}) do
       local g = c.geometry[leg.id]
       local p = g and g.points and g.points[1]
@@ -1562,7 +1562,7 @@ placeTrigger = function()
 end
 
 -- Every few seconds: the game's mission list is read once, and cleared only when the mod manager is ready, so an add-on
--- installed while the game runs (BeamNG.Earth 1.9.0's Add-ons page) had no activities until Ctrl+L (GitHub #1). Our loop
+-- installed while the game runs (BeamNG.Earth 1.9.0's Add-ons page) had no activities until Ctrl+L. Our loop
 -- missing from it clears it, once (not while a mission runs: that holds its own mission object). And whenever the game
 -- has built its mission objects again (a reload of the list), they came from info.json: the markers are placed again.
 local function missionsTick()
@@ -1650,7 +1650,7 @@ function M.onUpdate(dt)
       st.phase = 'idle'
       -- A start from the main menu loads the level through the manager's task chain; the loading screen is taken down by
       -- the mission's own flowgraph (fadeFromBlack / hideLoadingScreen), which stopping the mission skipped: it stayed up
-      -- over a running level (GitHub #19). Taking it down is what the flowgraph would have done (a no-op when it is gone).
+      -- over a running level. Taking it down is what the flowgraph would have done (a no-op when it is gone).
       if server and server.fadeoutLoadingScreen then
         local ok, err = pcall(server.fadeoutLoadingScreen, true)
         ownLog('I', 'loading screen taken down' .. (ok and '' or (': ' .. tostring(err))))
@@ -1664,7 +1664,7 @@ function M.onUpdate(dt)
     else
       st.restartAt, st.restartMission, st.restartStopped, st.restartTries = nil, nil, nil, nil
       -- Stopping the stray loop let go of Earth's drop hold while the ground was still being built: the player fell through
-      -- it (GitHub #21). Earth's own teleport to where the player is holds and grounds it again.
+      -- it. Earth's own teleport to where the player is holds and grounds it again.
       local plLat, plLon = earthapi.position()
       if mission and plLat then
         ownLog('I', 'the player put on the ground again (Earth teleport to where it is)')

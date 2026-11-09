@@ -1,4 +1,4 @@
--- Roads under props (GitHub #59): a prop whose footprint is within a road's half width plus a margin of the road is not placed.
+-- Roads under props: a prop whose footprint is within a road's half width plus a margin of the road is not placed.
 --
 -- The props are TSStatic shapes without collision (props.lua): a table that stands on the road leading out of the service park is
 -- scenery the car drives through. The game's navgraph (the stock `map` extension: map.getMap().nodes, each with `pos`, `radius`
@@ -156,7 +156,7 @@ end
 
 M.PUSH_STEP_M = 0.25
 
--- A prop that is on a road, moved out of it (GitHub #61): along the normal of the road it is deepest in, away from the centre line (on
+-- A prop that is on a road, moved out of it: along the normal of the road it is deepest in, away from the centre line (on
 -- the side `prop.side` says, 1 right and -1 left of the direction of travel, when it stands on the centre line itself), in steps of
 -- PUSH_STEP_M, up to maxPush, until its footprint is clear of every road and the margin. Returns the new x, y and how far it moved, or
 -- nil when it was not on a road or no push up to maxPush clears it.

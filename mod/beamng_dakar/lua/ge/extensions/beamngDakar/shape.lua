@@ -1,17 +1,17 @@
--- Transient ground shaping along a special stage (GitHub #41): the terrain block's heights along the curated road line
--- (curate.lua) are changed, in memory, where the elevation data has a defect the road does not, and nowhere else (GitHub #63).
+-- Transient ground shaping along a special stage: the terrain block's heights along the curated road line
+-- (curate.lua) are changed, in memory, where the elevation data has a defect the road does not, and nowhere else.
 --
 -- BeamNG.Earth paints the asphalt into the ground photo and draws the centre and edge lines as a mesh 2.5 cm over its own ground
--- (GitHub #61, from the user's server: near visual 'detail', geotiles, the default roads-in-ground). The mesh does not follow our
+-- (from the user's server: near visual 'detail', geotiles, the default roads-in-ground). The mesh does not follow our
 -- terrain: every cell of the road core we move buries the lines (raised) or leaves them floating (lowered). So the road is left
 -- exactly as Earth made it, every cell untouched, but for
---   * the ground under an overpass, where the elevation data has the deck baked in as a ridge (GitHub #61), and
+--   * the ground under an overpass, where the elevation data has the deck baked in as a ridge, and
 --   * a big spike or dip on the road line, SPIKE_M or more off the line's own trend over a short window (curate.despike): a defect of
 --     the data, not relief (a steep climb or a hillside is not one), and
 --   * the ground at either end of a deck, which is met to the deck's top with a smooth ramp that follows the road's ground beyond it, raising or
---     cutting it (GitHub #61, #69, #71): a span OpenStreetMap tags as
+--     cutting it: a span OpenStreetMap tags as
 --     a bridge, and a deck of our own road the game's colliders show (a wide collider whose top continues from the road at its ends, over a
---     gully or a culvert OpenStreetMap does not tag). A narrow collider at road level is never the reason to move the ground (GitHub #65: a
+--     gully or a culvert OpenStreetMap does not tag). A narrow collider at road level is never the reason to move the ground (a
 --     retaining wall at a hairpin was taken for a deck).
 -- Where one of those is, the change is a delta, not a flat core: a cell is moved by w * (the line's fixed height - the ground under
 -- the line) at the nearest point of the line, w the falloff, so the road's cross slope and camber and what Earth graded are kept and
@@ -35,7 +35,7 @@
 -- each kept under MAX_BOX_CELLS cells), the segments nearest the player first, and the first slice after a commit gets a
 -- bigger budget for the stretch right at the car.
 --
--- The ground under a moving car must never change between two physics frames (GitHub #59: at a swap the new block brings
+-- The ground under a moving car must never change between two physics frames (at a swap the new block brings
 -- Earth's own ground back under the car, our shaping landed some frames later, and the car was thrown by the step, up to
 -- the shaping's change, twice). So:
 --   * blockChanged() shapes the stretch round the car (what it covers in a second, and a margin) at once, in the same Lua call as Earth's swap or load, before
@@ -46,7 +46,7 @@
 --     as they are, and does them once the car has passed them (or stopped).
 -- The change of a cell is capped at MAX_CHANGE_M (OVERPASS_CHANGE_M under an overpass and where the ground meets a deck's end), but a fix
 -- that asks for more than that is not left to be cut off at the cap, which leaves a plateau with the defect's steep sides: its delta is
--- scaled as a whole to the cap, so the remainder is spread over the whole stretch and its taper (GitHub #69).
+-- scaled as a whole to the cap, so the remainder is spread over the whole stretch and its taper.
 --
 -- Pure apart from the env it is given (block, clock, ground, player, log); the tests give it a stub TerrainBlock.
 local curate = require('beamngDakar/curate')
@@ -61,10 +61,10 @@ M.BUDGET_MS = 1.5           -- the shaping work of one frame
 M.URGENT_BUDGET_MS = 6      -- the first slice after a commit: the road at the car must be right at once ...
 M.URGENT_M = 150            -- ... which is the segments within this far of the player
 M.MAX_BOX_CELLS = 6000      -- the box handed to one updateGrid (~0.15 us a cell) is at most this
-M.MAX_CHANGE_M = 4          -- no cell is moved further than this (#47, #59)
+M.MAX_CHANGE_M = 4          -- no cell is moved further than this
 M.SPIKE_M = 2.0             -- a point of the line is a spike when its ground is this far off the straight line between the points k steps
                             -- either side of it, the median over k = 1 .. curate.SPIKE_HALF (a crest of 4 percent change per 10 m: 1.3 m).
-                            -- Not 1.5 (GitHub #65): fixing a bump lowers the road and leaves Earth's road lines floating over it, and a hairpin's
+                            -- Not 1.5: fixing a bump lowers the road and leaves Earth's road lines floating over it, and a hairpin's
                             -- cut on a steep hillside, where the curated line is a few metres off the road and the ground under it is the slope
                             -- beside it, is flagged by 1.5 m. The viaduct's ridge is an overpass fix of its own, not a spike. An edition may set
                             -- its own (legs.json: "shaping": { "spikeM": 2.5 })
@@ -72,20 +72,20 @@ M.TAPER_M = 15              -- a fix ends in a taper along the line: the points 
                             -- falls from the spike to the first point beyond, where it is 0)
 M.DECK_ABOVE_M = 2.5        -- ... and where a static collider stands this far above the ground on the line (a deck or an overpass)
 M.DECK_ACROSS_M = 2         -- a collider is a deck or an overpass only when it is under the line and also this far to either side of it,
-M.DECK_ACROSS_TOL_M = 0.6   -- at the same height within this (a road's camber): a wall, a barrier, a rail or a pole beside the line is narrow (GitHub #65)
+M.DECK_ACROSS_TOL_M = 0.6   -- at the same height within this (a road's camber): a wall, a barrier, a rail or a pole beside the line is narrow
 M.DECK_MIN_RUN_M = 8        -- and a deck the road is on runs on for this far along the line at least (two points of the 10 m line)
 M.DECK_LAND_M = 1.0         -- a wide collider this far over the ground is on a deck (a run of those with one DECK_ABOVE_M over is a deck or an
-                            -- overpass; the points beyond it are the road, within this of the ground: where the deck lands, GitHub #69)
-M.DECK_STEP_M = 1.0         -- a deck's top may bend this much from the line between its neighbours (a hump, a grade that changes: GitHub #69) ...
+                            -- overpass; the points beyond it are the road, within this of the ground: where the deck lands)
+M.DECK_STEP_M = 1.0         -- a deck's top may bend this much from the line between its neighbours (a hump, a grade that changes: ) ...
                             -- and change by this much more than a road's steepest grade over the step between two points: more is a structure
 M.DECK_JOIN_TOL_M = 1.0     -- the run is a deck our road is on when its top where it begins (or ends) continues from the road just beyond it:
 M.DECK_JOIN_PER_M = 0.08    -- within this plus this a metre of the gap between the two points (a grade and a hump over 10 m of line); an overpass
-                            -- stands metres above the road there (GitHub #61, #69)
+                            -- stands metres above the road there
 M.DECK_LIP_M = 0.3          -- the deck's end, found by rays every DECK_LIP_STEP_M along the line from the road: where a wide collider
 M.DECK_LIP_STEP_M = 1       -- stands this far over the ground (a pavement's few cm are no deck)
 M.RAMP_MIN_M = 15           -- the ground meets a deck's end with a ramp this long at least, and as long as the grade change limit asks
 M.RAMP_SCORE = 0.85         -- the ramp keeps this part of the grade and the grade change limits (the heights between its samples are a line: some margin)
-M.RAMP_MAX_M = 150          -- ... and at most this long (GitHub #71)
+M.RAMP_MAX_M = 150          -- ... and at most this long
 M.RAMP_NEAR_M = 8           -- the ground along a ramp is measured every RAMP_NEAR_STEP_M for this far from the deck's end (the ground right past a
 M.RAMP_NEAR_STEP_M = 1      -- deck falls away into the ditch under it within a metre or two), then every RAMP_STEP_M
 M.RAMP_STEP_M = 2.5
@@ -97,12 +97,12 @@ M.DECK_RAY_M = 450          -- the static colliders of Earth's decks exist withi
                             -- at with rays only this near it (a ray a point is the largest cost of the plan)
 M.DECK_PIN_INTO_M = 2.5     -- the height of a deck at a span's end is measured this far onto it, and the shaped ground is pinned to it ...
 M.DECK_PIN_MAX_M = 3        -- ... when it is within this of the ground there (a deck at road level; else the ground is kept), or within this of the
-M.DECK_PIN_DITCH_M = 6      -- road's ground just beyond it when the ground under the deck's end is not more than this far under it (a ditch, GitHub #71)
+M.DECK_PIN_DITCH_M = 6      -- road's ground just beyond it when the ground under the deck's end is not more than this far under it (a ditch)
 M.OVERPASS_PAD_M = 20       -- the ground under an overpass and this far beyond it (the elevation data has the deck as a ridge wider than
                             -- the deck) is taken as the straight line between the ground beyond: the delta is the ridge, and
 M.OVERPASS_CHANGE_M = 8     -- may be moved this far (the cap of MAX_CHANGE_M is for the ground a road is on; a viaduct's ridge is more)
 M.SYNC_MARGIN_M = 22        -- at a new block the cells within the stretch the car covers in SYNC_S seconds plus this are shaped at
-M.SYNC_S = 0.5              -- once (#59; GitHub #61: a 150 m stretch cost 24.6 ms at 35 m/s); the rest follows over the next frames,
+M.SYNC_S = 0.5              -- once (a 150 m stretch cost 24.6 ms at 35 m/s); the rest follows over the next frames,
 M.SYNC_MAX_M = 45           -- long before the car is there (never closer than FREEZE_M and what it covers in FREEZE_S, which is inside
 M.SYNC_BUDGET_MS = 7        -- this), at most this far. What lies within the freeze radius is done whatever it costs; the rest of the
                             -- stretch only while the call stays under this many ms (the frames take it up)
@@ -165,7 +165,7 @@ function E:setLines(lines)
 end
 
 -- A new block's heights are in (Earth's load or swap): what was written to the old data is gone with it. The block's own
--- ground is under the car now, so the stretch round the car is shaped before this returns (GitHub #59); `stale` says the
+-- ground is under the car now, so the stretch round the car is shaped before this returns; `stale` says the
 -- lines are not in the frame of this block (a rebase or a teleport is under way: setLines follows with the new ones).
 function E:blockChanged(stale)
   self.gen = self.gen + 1
@@ -257,7 +257,7 @@ end
 
 -- Is a collider that stands `top` at (x, y) wide enough to carry or cover the road: is there one at the same height (DECK_ACROSS_TOL_M)
 -- DECK_ACROSS_M to either side of that point, across the line whose direction there is (dx, dy)? A wall, a barrier, a rail, a pole or a
--- building's corner beside the road is narrow, the deck of a bridge or an overpass is not (GitHub #65). The game's ray finds the ground
+-- building's corner beside the road is narrow, the deck of a bridge or an overpass is not. The game's ray finds the ground
 -- where no collider is, so a narrow one has a different height beside it.
 local function carriesAcross(env, x, y, dx, dy, top, hint)
   local l = sqrt(dx * dx + dy * dy)
@@ -270,14 +270,14 @@ local function carriesAcross(env, x, y, dx, dy, top, hint)
   return true
 end
 
--- What the colliders standing above the line are (GitHub #61, #65, #69). `top[i]`: the top of the static colliders at point i (nil: not asked or
+-- What the colliders standing above the line are. `top[i]`: the top of the static colliders at point i (nil: not asked or
 -- nothing), wide[i]: it is wide enough to be a deck or an overpass (carriesAcross; asked where it stands DECK_LAND_M over the ground), G[i]: the
 -- game's ground there, cum[i]: metres along the line. A maximal run of points whose wide collider stands more than DECK_LAND_M over the ground,
 -- with one more than DECK_ABOVE_M over it, runs from where the deck lands on the road before it to where it lands past it, and is either
 --   * a deck our road is on: where it begins (or ends) its top continues from the ground just before (after) it, as a road does onto a
 --     bridge, however far its middle stands over a gully or a culvert, and its top does not jump from one point to the next beyond what a
 --     grade and a hump do (a structure beside the road does): deck[i], left alone, and its ends are met (the ground follows the road
---     we drive, GitHub #69: ends[k] = { i, j, joinA, joinB, note } says which ends continue from the road); or
+--     we drive: ends[k] = { i, j, joinA, joinB, note } says which ends continue from the road); or
 --   * an overpass above the road (the A25 over the Svolte di Popoli's SR17 at 22 and 31 degrees): its top is metres above the road
 --     where it begins, nothing continues from the ground: over[i], the road is under it and the ground is shaped as everywhere else.
 -- Anything else (a collider that is narrow, a run too short to be a deck, with a jump in its top) is no deck and no overpass: the ground is
@@ -356,7 +356,7 @@ end
 
 -- Where a deck's end is and the height it must be met at, for the end of a stretch of the line that goes onto (toward = 1) or off (toward = -1) a deck:
 -- the road is at point e, the deck begins (as seen from e) between it and the next point, wherever a wide collider first stands over the
--- ground (rays every DECK_LIP_STEP_M along the line: the end of a deck over a gully is not at a point of the line, GitHub #69); the deck's top
+-- ground (rays every DECK_LIP_STEP_M along the line: the end of a deck over a gully is not at a point of the line); the deck's top
 -- is measured a little onto it (rays DECK_LIP_STEP_M and DECK_PIN_INTO_M further, wide as a road, within DECK_PIN_MAX_M of the ground there) and
 -- taken back to the end along its grade. Returns { e, dir, lx, ly (the end), tl (its
 -- distance from e), dp (the deck's top minus the ground there) } or nil. `ground` is the game's ground at (x, y) or nil.
@@ -383,7 +383,7 @@ local function meetDeck(self, ground, pts, G, e, toward)
   -- the deck's top a little onto it, and DECK_PIN_INTO_M further: the top at its end is the first one taken back along their grade (a deck
   -- on a 6 percent grade is 15 cm lower at its end than 2.5 m onto it, which would leave the ground that much over it). It is a deck at road
   -- level when it is within DECK_PIN_MAX_M of the ground there or of the road's ground at the point e (the ground under a deck's end can be a
-  -- ditch, GitHub #71: the road beyond it is not)
+  -- ditch: the road beyond it is not)
   local function topAt(s)
     local x, y = a[1] + ux * (t + s), a[2] + uy * (t + s)
     local h = env.deck(x, y, gl)
@@ -440,14 +440,14 @@ local function hermiteScore(p0, m0, p1, m1, L)
   return score
 end
 
--- The ground of the road past a deck's end (GitHub #71). The road leaves the deck at pin ({ lx, ly (the deck's end), tl (its distance to the line's
+-- The ground of the road past a deck's end. The road leaves the deck at pin ({ lx, ly (the deck's end), tl (its distance to the line's
 -- point e), top (the deck's top there), gd (its grade going away from the deck) }) and runs on along the line from point e by `step` through the
 -- run of points i to j. The ground of that road is measured along it (the block's heights, before any change of ours: every metre for the first
 -- RAMP_NEAR_M, the ground right past a deck falls away into the ditch under it, then every RAMP_STEP_M), and the height it should have is the deck's
 -- top going on along its grade, joined to the ground at L (the ground there, with its grade) with a cubic, which has no step in the height or the grade
 -- at either end; L is the shortest from RAMP_MIN_M up that keeps the grade and the grade change of a road. The delta at each sample is that height minus
 -- the ground there: positive where the ground is under it, NEGATIVE where it is over (a hillside, a bank: the ground is cut down to the deck's top,
--- GitHub #71), 0 from L on. (PR #70 gave the ground past the end the deck's top minus the ground UNDER the deck's end, which is a ditch's edge, and
+-- ), 0 from L on. (An earlier version gave the ground past the end the deck's top minus the ground UNDER the deck's end, which is a ditch's edge, and
 -- applied it to the road beyond, which Earth had graded to the deck's level: a wall of the ditch's depth across the road.)
 -- Returns { dir, tagged, pin, L, n (samples to L), d, x, y, G (the ground), D (the delta), z (the height asked for), sLip (metres along the line at the
 -- deck's end), sign (+1: the line's metres grow with d), prof (the points of the log: { d, x, y, earth, target }) } or nil.
@@ -534,7 +534,7 @@ end
 
 -- Segments of the lines inside the block, as parallel arrays, the segments within the stretch the player is at
 -- first. Bridges and tunnels (curated spans, a deck) are not in it; the ground under an overpass is. S.stop[k] is 2 for the segments of a ramp
--- (makeRamp, GitHub #69, #71): the cells behind a segment's start, projected on it, are under the deck, or the segment before's, and not its to move.
+-- (makeRamp): the cells behind a segment's start, projected on it, are under the deck, or the segment before's, and not its to move.
 local function plan(self, tb, info, off)
   local env = self.env
   local reach = M.CORE_M + M.BLEND_M
@@ -545,7 +545,7 @@ local function plan(self, tb, info, off)
   local S = { ax = {}, ay = {}, az = {}, dx = {}, dy = {}, dz = {}, l2 = {}, near = {}, ln = {}, s = {}, cap = {}, stop = {}, n = 0, cuts = {} }
   local skipped = { span = 0, ground = 0, deck = 0, over = 0, pinned = 0 }
   -- the stretches fixed: how many of each kind, their length along the line, the largest delta, and each one's place (list); what the
-  -- colliders over the line were taken for (found: a deck left alone, a narrow one, ...), for the log (GitHub #65)
+  -- colliders over the line were taken for (found: a deck left alone, a narrow one, ...), for the log
   local fixes = { n = 0, length = 0, largest = 0, list = {}, found = {}, spread = 0, spreadMax = 0, ramps = {} }
   local rim = M.EDGE_CELLS + 2
   local rayR2 = M.DECK_RAY_M * M.DECK_RAY_M
@@ -589,7 +589,7 @@ local function plan(self, tb, info, off)
     local cum = { 0 }
     for i = 2, #pts do cum[i] = cum[i - 1] + sqrt((pts[i][1] - pts[i - 1][1]) ^ 2 + (pts[i][2] - pts[i - 1][2]) ^ 2) end
     local deck, over, notes, deckRuns = classifyDecks(G, top, wide, cum, #pts)
-    -- Where the road goes onto or off a deck of ours the colliders show, the ground meets the deck's top (GitHub #69): pins[e] lists the
+    -- Where the road goes onto or off a deck of ours the colliders show, the ground meets the deck's top: pins[e] lists the
     -- ways the ground at point e, the last (first) of a run before (after) a deck, is met to it. Not at the end of a tagged span or one the
     -- profile found (line.skip: the ends of those are met further down, or not at all).
     local pins = {}
@@ -630,17 +630,17 @@ local function plan(self, tb, info, off)
       q = i
       while q <= #pts and cum[q] - cum[i] <= M.OVERPASS_PAD_M do padded[q] = true; q = q + 1 end
     end
-    -- What is fixed (GitHub #63), as a delta D[i] at each point: the height the line should have there minus the ground under it, 0
+    -- What is fixed, as a delta D[i] at each point: the height the line should have there minus the ground under it, 0
     -- where the ground is as it should be, and the ground is not touched at all. The game's own ground is the reference, not the
     -- line's heights: those are the offline terrain data plus one offset, and at the Popoli stage's start they stood 10 m above the
-    -- game's ground (GitHub #47). A run of points is broken at a bridge or a tunnel span, a deck, and where the ground is not known.
+    -- game's ground. A run of points is broken at a bridge or a tunnel span, a deck, and where the ground is not known.
     --   * core points: under an overpass (and the pad past it), where the elevation data has the viaduct's deck in it as a ridge, and the
     --     spikes of the profile (curate.despike with SPIKE_M) with the points within TAPER_M of them, the taper along the line. Their
     --     fixed height is the straight line between the nearest points that are not core: for a spike its own foot, which is why
     --     the delta ends at 0 there;
     --   * the first points of a run next to a bridge OpenStreetMap tags (line.skip[i] == 'tagged'): the ground is met to the deck's height,
     --     measured (a ray, which must hit something as wide as a road), and the delta ramps to 0 over TAPER_M into the run. A span the
-    --     profile alone found, and a deck the colliders show, are left alone without that (GitHub #65).
+    --     profile alone found, and a deck the colliders show, are left alone without that.
     local D, kindAt = {}, {}
     local ramps = {}
     local i = 1
@@ -714,7 +714,7 @@ local function plan(self, tb, info, off)
                 end
                 if kind[m] == 'overpass' then isOver = true end
               end
-              -- A fix that asks for more than MAX_CHANGE_M is spread, not cut off at the cap (GitHub #69): held at the cap cell by cell it
+              -- A fix that asks for more than MAX_CHANGE_M is spread, not cut off at the cap: held at the cap cell by cell it
               -- leaves a plateau at the cap with the defect's own steep sides (a step). The whole stretch's delta is scaled to the cap,
               -- the remainder is the defect's shape smaller, over the same stretch and taper. (An overpass has its own, bigger cap.)
               local scale = 1
@@ -732,7 +732,7 @@ local function plan(self, tb, info, off)
             q = q + 1
           end
           -- the ends next to a tagged span, and next to a deck of ours the colliders show: the ground of the road beyond the deck's end follows
-          -- the deck's top and is joined to Earth's ground there (makeRamp, GitHub #69, #71). The ramps are segments of their own (below): the
+          -- the deck's top and is joined to Earth's ground there (makeRamp). The ramps are segments of their own (below): the
           -- delta along them is measured on the ground of the road, point by point, not at the line's points
           local function addRamp(pin, step)
             local r = makeRamp(groundHere, pts, cum, i, j, pin, step)
@@ -789,7 +789,7 @@ local function plan(self, tb, info, off)
           fixes[kind] = (fixes[kind] or 0) + 1
           fixes.length = fixes.length + (cum[x1] - cum[x0])
           if big > fixes.largest then fixes.largest = big end
-          -- (where it is, for the log: GitHub #65, the user could not tell which stretch was the false one)
+          -- (where it is, for the log: the user could not tell which stretch was the false one)
           fixes.list[#fixes.list + 1] = { ln = ln, kind = kind, s0 = cum[x0], s1 = cum[x1], x = pts[at][1], y = pts[at][2], d = D[at] }
         end
         q = q + 1
@@ -833,7 +833,7 @@ local function plan(self, tb, info, off)
           S.dx[k], S.dy[k], S.dz[k] = bx - ax, by - ay, d1 - d0
           S.l2[k] = S.dx[k] * S.dx[k] + S.dy[k] * S.dy[k]
           S.ln[k], S.s[k] = ln, r.sLip + r.sign * r.d[q]
-          S.cap[k] = M.OVERPASS_CHANGE_M              -- (where the road meets a deck the ground must match it, GitHub #69)
+          S.cap[k] = M.OVERPASS_CHANGE_M              -- (where the road meets a deck the ground must match it)
           S.stop[k] = 2
           nearCar(k, ax, ay)
         end
@@ -863,7 +863,7 @@ local function plan(self, tb, info, off)
 end
 
 -- The height a cell at world (x, y), now at `orig` (world height), is given: orig + w * (the delta of the line at the nearest
--- point), w the falloff (GitHub #63: the cell keeps its place in the road's cross slope and camber, it moves with the line); nil when
+-- point), w the falloff (the cell keeps its place in the road's cross slope and camber, it moves with the line); nil when
 -- no line reaches it. The second result is the square of the cell's distance to the nearest segment (the road core is within CORE_M
 -- of the line).
 local CK, CD, CZ = {}, {}, {}                 -- (scratch: the segments that reach the cell)
@@ -941,7 +941,7 @@ end
 
 -- The offset a new block's grid needs, from the one measured on the block before (the grid's own convention, above the
 -- block's base height or absolute, is the file format's and does not change between swaps: only the base height does). Used
--- when the game's ground cannot be measured against yet, in the call that swaps the block in (GitHub #59).
+-- when the game's ground cannot be measured against yet, in the call that swaps the block in.
 local function predictOffset(self, info)
   local c = self.conv
   if not c then return nil end
@@ -1031,7 +1031,7 @@ local function flush(self, job, box)
     self.warnedGrid = true
     log(self, 'E', 'shaping: updateGrid failed: ' .. tostring(err))
   end
-  -- (what is drawn on the ground of that box is told, GitHub #61: the DecalRoads over it are cut again, reclip.lua)
+  -- (what is drawn on the ground of that box is told: the DecalRoads over it are cut again, reclip.lua)
   if ok and env.changed then
     local i = job.info
     pcall(env.changed, i.px + box[1] * i.sq, i.py + box[2] * i.sq, i.px + box[3] * i.sq, i.py + box[4] * i.sq)
@@ -1064,7 +1064,7 @@ local function heightAt(tb, info, off, x, y)
   return off + (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
 end
 
--- After the shaping (GitHub #71): for each deck end, one compact line with the profile of the ground along the line every PROFILE_STEP_M (Earth's
+-- After the shaping: for each deck end, one compact line with the profile of the ground along the line every PROFILE_STEP_M (Earth's
 -- ground before our change, the height asked for, the ground written, and what a ray from above hits there: the deck, the ground), all as heights over
 -- the deck's top line going on past its end; and a check of what was written within the ramp, every metre: a step of STEP_WARN_M or more between two points 1 m apart
 -- and a ground that stands STEP_WARN_M or more over (or under) the height asked for are warned about, with where.
@@ -1133,8 +1133,8 @@ local function finish(self, job)
     s.state = job.cells > 0 and 'shaped' or 'nothing to shape'
     s.structures = job.skipped
     s.stretches, s.fixLength, s.fixLargest = job.fixes.n, job.fixes.length, job.fixes.largest
-    -- (GitHub #59: where the biggest change is, on the road's core or beside it, and what the cap held back)
-    -- (GitHub #63: only what is fixed is written, the rest of the road is as Earth made it)
+    -- (where the biggest change is, on the road's core or beside it, and what the cap held back)
+    -- (only what is fixed is written, the rest of the road is as Earth made it)
     local f = job.fixes
     log(self, 'I', string.format('shaping: %d stretch%s of the line fixed (%d under an overpass, %d spike%s, %d deck end%s), %.0f m of it with the tapers, ' ..
       'largest change of the line %.1f m; %d cells written along %d segments in %d frames, %.1f ms, largest change %.1f m (%.1f m on the road core, ' ..
@@ -1143,7 +1143,7 @@ local function finish(self, job)
       f.overpass or 0, f.spike or 0, (f.spike or 0) == 1 and '' or 's', f['deck end'] or 0, (f['deck end'] or 0) == 1 and '' or 's',
       f.length, f.largest, job.cells, job.S.n, job.frames, ms, job.maxChange, job.maxCore, M.CORE_M, job.wantedMax, job.wantedCore,
       job.capped, M.MAX_CHANGE_M, job.skipped.span, job.skipped.deck, job.skipped.ground, job.skipped.over, job.skipped.pinned))
-    -- (GitHub #65: where each stretch is, in metres along its line and in the world, and what the colliders over the line were taken for:
+    -- (where each stretch is, in metres along its line and in the world, and what the colliders over the line were taken for:
     -- the 'deck ends' of a stage with no bridge were a collider the shaping took for a deck, and the log could not say where)
     reportRamps(self, job)
     for q, fx in ipairs(f.list) do
@@ -1177,9 +1177,9 @@ local function finish(self, job)
       log(self, 'I', string.format('shaping: a collider %.1f m over the ground at %.0f to %.0f m along line %d (x %.0f, y %.0f) is %s',
         fd.above, fd.s0, fd.s1, fd.ln, fd.x, fd.y, what[fd.why] or fd.why))
     end
-    -- (GitHub #61: BeamNG.Earth paints a road's asphalt into the ground, which follows, but its centre and edge lines are a mesh draped on
+    -- (BeamNG.Earth paints a road's asphalt into the ground, which follows, but its centre and edge lines are a mesh draped on
     -- the ground as it was (server/roadmesh.py, 2.5 cm over it): where the ground moved more than LINE_TOL_M they are buried (raised)
-    -- or float (lowered). Since GitHub #63 that is only at the stretches fixed: the count says how many cells.)
+    -- or float (lowered). Since that is only at the stretches fixed: the count says how many cells.)
     if job.linesUp + job.linesDown > 0 then
       log(self, 'I', string.format('shaping: of %d cells of the road core moved, %d moved %.0f cm or more (%d raised, %d lowered): ' ..
         'Earth\'s road lines, a mesh on the ground as it was, stay at the old height there (road lines stranded, at the stretches fixed)', job.coreMoved, job.linesUp + job.linesDown,
@@ -1215,11 +1215,11 @@ local function cellShaper(self, job)
     local want = z - orig
     local a = abs(want)
     local onCore = d2 <= core2
-    local cap = segCap[kb] or M.MAX_CHANGE_M            -- (more under an overpass, GitHub #61)
+    local cap = segCap[kb] or M.MAX_CHANGE_M            -- (more under an overpass)
     if a > job.wantedMax then job.wantedMax = a end
     if onCore and a > job.wantedCore then
       job.wantedCore = a
-      -- (where the core was asked for more than the cap: the log says, GitHub #61: x, y, metres along the line, which line)
+      -- (where the core was asked for more than the cap: the log says: x, y, metres along the line, which line)
       if a > cap then job.coreAt = { wx, wy, S.s[kb], S.ln[kb] } end
     end
     if a > cap then
@@ -1228,7 +1228,7 @@ local function cellShaper(self, job)
       job.capped = job.capped + 1
     end
     if a < minChange then return false end
-    if onCore then                                      -- (GitHub #61: the lines Earth drew on the old ground stay where they were)
+    if onCore then                                      -- (the lines Earth drew on the old ground stay where they were)
       job.coreMoved = job.coreMoved + 1
       if a >= M.LINE_TOL_M then
         if z > orig then job.linesUp = job.linesUp + 1 else job.linesDown = job.linesDown + 1 end
@@ -1284,7 +1284,7 @@ local function runShape(self, job, budget, limit, fr, region)
         elseif not job.seen[idx] then
           job.seen[idx] = true
           if fr and (wx - fr.x) ^ 2 + (wy - fr.y) ^ 2 <= fr.r2 then
-            later[#later + 1] = idx                       -- (the car is on it: when it has passed, GitHub #59)
+            later[#later + 1] = idx                       -- (the car is on it: when it has passed)
           elseif cell(gx, gy, wx, wy) then
             box = touch(self, job, box, gx, gy)
           end
@@ -1379,7 +1379,7 @@ local function fail(self, err)
   self.stat.state = 'failed: ' .. tostring(err)
 end
 
--- At a new block, before the next physics step: the stretch of the lines round the car, all of it (GitHub #59). Called from blockChanged, so in the same Lua call as Earth's swap or load. What is left carries on over
+-- At a new block, before the next physics step: the stretch of the lines round the car, all of it. Called from blockChanged, so in the same Lua call as Earth's swap or load. What is left carries on over
 -- the frames as a job.
 function E:shapeNow()
   local env = self.env
@@ -1398,7 +1398,7 @@ function E:shapeNow()
     return
   end
   local reach = M.CORE_M + M.BLEND_M
-  -- Two passes (GitHub #61: the one pass over a disc of 150 m cost 24.6 ms at 35 m/s, a visible hitch). The cells a later frame
+  -- Two passes (the one pass over a disc of 150 m cost 24.6 ms at 35 m/s, a visible hitch). The cells a later frame
   -- would leave alone for the moving car (within the freeze radius, and a margin) are done whatever they cost, those are what
   -- keeps the ground under the car as the old block had it; then the rest of the stretch (to R) only while the call stays under
   -- SYNC_BUDGET_MS: the frames do what is left, well before the car is there.

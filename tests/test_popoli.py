@@ -1,4 +1,4 @@
-"""The Svolte di Popoli edition (GitHub #40): the SR17 hillclimb as a loop with one special stage. Its legs and the files
+"""The Svolte di Popoli edition: the SR17 hillclimb as a loop with one special stage. Its legs and the files
 tools/fetch_route.py and tools/stage_closures.py wrote, then what legs.materialize makes of them."""
 import json
 import math
@@ -77,7 +77,7 @@ def test_the_special_is_the_published_hillclimb(geometry):
     ss = geometry["ss1"]
     hs = [p[2] for p in ss["points"]]
     # (the stage starts past the junction of the side road, 40 m up the SR17 from it and well north of the railway underpass,
-    # which is blocked in the game: GitHub #50, #55)
+    # which is blocked in the game: )
     assert ss["lengthM"] == pytest.approx(7250, abs=100)
     assert hs[0] == pytest.approx(250, abs=10) and hs[-1] == pytest.approx(725, abs=10)
     assert hs[-1] - hs[0] == pytest.approx(475, abs=20)
@@ -106,10 +106,10 @@ def test_the_transfer_is_short_and_leaves_a_parking_lot_for_the_stage_start(geom
     assert 100 < road["lengthM"] < 2000
     lot = road["servicePark"]
     assert lot["aisles"] > 1 and lot["lengthM"] >= 80
-    assert metres((lot["lat"], lot["lon"]), (lot["spawn"]["lat"], lot["spawn"]["lon"])) < 1       # (the car starts on an aisle, GitHub #55)
+    assert metres((lot["lat"], lot["lon"]), (lot["spawn"]["lat"], lot["spawn"]["lon"])) < 1       # (the car starts on an aisle)
     assert metres(road["points"][0], lot["lead"][-1][:2]) < 1                                    # and TC0, where the lead ends, starts the leg
     assert metres(road["points"][-1], ss["points"][0]) < 1          # the stage starts where the transfer ends
-    assert metres(road["points"][0], (42.1749, 13.8231)) < 50       # the car park north of the railway (#50)
+    assert metres(road["points"][0], (42.1749, 13.8231)) < 50       # the car park north of the railway
 
 
 def test_the_special_has_closures_on_its_side_roads(geometry):

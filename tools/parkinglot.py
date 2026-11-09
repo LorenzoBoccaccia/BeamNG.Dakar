@@ -8,7 +8,7 @@ it lies on drivable ground inside the lot. Not exact: a guess, as asked.
 
 The lot's extent comes from the same release: the parking polygons of its `base` theme (class 'parking', OpenStreetMap's
 amenity=parking areas) that touch the aisles, and the buildings near it, for the service booth that stands in the lot
-(tools/booth.py, GitHub #57).
+(tools/booth.py).
 
 Needs duckdb (server/requirements.txt of BeamNG.Earth has it) and network access to overturemaps-us-west-2.s3.amazonaws.com.
 """
@@ -172,7 +172,7 @@ def surroundings(lat, lon, radius_m=AREA_RADIUS_M):
     return ([p for r in park for p in decode_polygons(r[0])], [p for r in built for p in decode_polygons(r[0])])
 
 
-# The other roads round a lot (GitHub #59). The game draws them (BeamNG.Earth's roads) and a prop on one is scenery the car drives
+# The other roads round a lot. The game draws them (BeamNG.Earth's roads) and a prop on one is scenery the car drives
 # through: the booth (tools/booth.py) is kept off them as it is off the aisles. The roads are the classes and subclasses Earth's
 # navgraph keeps (the drivable ones: its server/navgraph.py DRIVE and SKIP_SUBCLASSES, so the offline check and the runtime check agree
 # about what a road is), with the half width each is drawn with, by guess.
@@ -233,7 +233,7 @@ def inside(p, ring):
 
 def find_lot(lat, lon, radius_m=1500.0):
     """Like find, with the lot's aisles: (info, [line, ...]) or None. The info also carries `_area` (the lot's parking polygons)
-    and `_buildings` (those near it) and `_roads` (the roads round it, GitHub #59) where the lookup worked: keys with an underscore are not written to the geometry as they are
+    and `_buildings` (those near it) and `_roads` (the roads round it) where the lookup worked: keys with an underscore are not written to the geometry as they are
     (tools/booth.py makes the booth from them)."""
     got = pick_lot(aisles(lat, lon, radius_m), lat, lon)
     if got:
@@ -252,7 +252,7 @@ def find_lot(lat, lon, radius_m=1500.0):
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Where the car starts in the lot (GitHub #55): on an aisle, inside the lot, driving toward the exit.
+# Where the car starts in the lot: on an aisle, inside the lot, driving toward the exit.
 #
 # The route out of the lot comes from the router (it leaves the aisles somewhere: the exit). The car is put on the lot's own
 # aisles further back from that exit, so that the first metres of the loop are a drive through the lot toward the exit, and
@@ -267,7 +267,7 @@ SPAWN_MIN_M = 25.0     # the car starts this far from the exit along the aisles,
 SPAWN_MAX_M = 90.0     # ... and at most
 SPAWN_FACING_DEG = 60.0  # the car starts toward the exit: its first 10 m are within this of the straight way to the exit
 TC0_AHEAD_M = 20.0     # TC0 stands this far ahead of the car (the stock loops park the car 65-73 m before it; on TC0 itself
-                       # the loop timed the player at once, GitHub #27) ...
+                       # the loop timed the player at once) ...
 TC0_SHARE = 0.6        # ... and at most this share of the way from the car to the exit
 
 
@@ -354,7 +354,7 @@ def spawn_plan(lines, exit_at, booth=None):
     first point and exit its last. None when the lot has no aisle.
 
     booth (optional): a function of such a path giving how many gazebos of the service booth fit beside the car at its start
-    (tools/booth.py, GitHub #57). Among the spots that start toward the exit the one with room for the most (up to BOOTH_CAP)
+    (tools/booth.py). Among the spots that start toward the exit the one with room for the most (up to BOOTH_CAP)
     is taken, the furthest back of those; where none has room the choice is as it was."""
     import heapq
     nodes, edges = aisle_graph([l for l in lines if len(l) >= 2])

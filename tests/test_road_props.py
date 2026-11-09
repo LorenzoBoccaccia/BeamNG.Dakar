@@ -1,4 +1,4 @@
-"""GitHub #59: props are not placed on roads.
+"""props are not placed on roads.
 
 The player found a table on the road leading out of the service park lot. The props (TSStatic shapes without collision) are
 checked against the roads the game knows (its navgraph: map.getMap().nodes, which BeamNG.Earth builds from the roads it streams,
@@ -312,7 +312,7 @@ def test_the_closure_tapes_stand_across_roads_on_purpose(lua):
     lua.execute("core.onUpdate(1)")
     left = standing(lua, "tape_road_closure")
     assert len(left) == len(tapes)                         # (the tape closes the side road: it is meant to be on it)
-    # a board on a road is not dropped (GitHub #61: a start without its boards is wrong): it is pushed out of the road
+    # a board on a road is not dropped (a start without its boards is wrong): it is pushed out of the road
     assert not lua.eval("DEL[%d]" % bid)
     now = [t for t in standing(lua, "signboard_start") if t[2] == bid]
     assert now and 0.2 < math.hypot(now[0][0] - bx, now[0][1] - by) <= 4.0

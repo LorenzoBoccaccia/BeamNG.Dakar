@@ -1,5 +1,5 @@
 -- What Dakar asks of BeamNG.Earth, through its modding API (beamngEarth_api, Earth 1.9.0, docs/ADDONS.md) when Earth has
--- it, else the way it was done before: Earth's own core state and the game's message call (Earth 1.8.2, GitHub #51).
+-- it, else the way it was done before: Earth's own core state and the game's message call (Earth 1.8.2).
 -- One module for the choice, so core.lua says what it wants and the two ways stay in one small place. Only what the API
 -- has an equivalent of is here: position, teleport, GPS destination, a message on screen, the add-on's options. The
 -- taps (core.lua TAPS) and the other internals (anchor ids, roads.readyAround, simhold, the route download) have no API

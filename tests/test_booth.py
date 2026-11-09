@@ -1,4 +1,4 @@
-"""The service booth where the car starts (GitHub #57): tools/booth.py on synthetic lots, the booths of both editions' geometry, and
+"""The service booth where the car starts: tools/booth.py on synthetic lots, the booths of both editions' geometry, and
 props.lua standing them."""
 import json
 import math
@@ -109,7 +109,7 @@ def street(north_m_from, north_m_to, east_m, cls="service"):
 
 
 def test_nothing_of_the_booth_stands_on_a_road_that_is_not_an_aisle():
-    # (GitHub #59: the player found a table on the road leading out of the lot)
+    # (the player found a table on the road leading out of the lot)
     origin, lead, route, lines, area = lot()
     free = booth.plan(origin, lead, route, lines, area)
     # a road across the lot's west part (a service road along x = -9.5), where the first gazebo behind the car stands
@@ -259,7 +259,7 @@ def test_the_booth_is_off_the_drive_from_the_spawn_to_tc0_and_out_of_the_lot_and
 
 @pytest.mark.parametrize("ed", EDITIONS)
 def test_the_booth_is_off_the_roads_round_the_lot(ed):
-    # (GitHub #59: the lot's drivable roads other than its aisles, which the geometry keeps, as it keeps the buildings)
+    # (the lot's drivable roads other than its aisles, which the geometry keeps, as it keeps the buildings)
     sp, _, lot, origin = lot_of(ed)
     assert sp["roads"] and all(r["class"] in pl.ROAD_HALF_M and len(r["line"]) >= 2 for r in sp["roads"])
     assert lot.roads
@@ -281,7 +281,7 @@ def test_the_car_stands_beside_the_booths_gazebo_with_tc0_further_on(ed):
     assert math.hypot(sum(p[0] for p in own) / len(own), sum(p[1] for p in own) / len(own)) <= 6.6     # by it, not a row away
     # TC0 and its own staging area stand further on: the booth is clear of them
     assert min(math.dist(p, lot.tc0) for pts in fp.values() for p in pts) >= booth.TC0_CLEAR_M - 0.05
-    assert 12 <= joins.metres(origin, g["points"][0][:2]) <= 21                     # TC0 17-20 m ahead of the car (GitHub #55)
+    assert 12 <= joins.metres(origin, g["points"][0][:2]) <= 21                     # TC0 17-20 m ahead of the car
 
 
 @pytest.mark.parametrize("ed", EDITIONS)

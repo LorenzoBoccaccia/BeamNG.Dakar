@@ -1,4 +1,4 @@
-"""The mission start, TC0, TC1, SS1 ... aligned (GitHub #55): the car starts in the parking lot facing its exit with TC0 ahead
+"""The mission start, TC0, TC1, SS1 ... aligned: the car starts in the parking lot facing its exit with TC0 ahead
 of it, every leg is driven into the next one from behind and the controls, the start line and the staging props all face
 along the road there. On both editions' real geometry and on a synthetic loop with several liaisons and specials."""
 import json
@@ -176,8 +176,8 @@ def test_tc0_is_a_few_metres_ahead_inside_the_lot_and_the_car_is_not_timed_at_on
     tc0 = tuple(g["points"][0][:2])
     assert joins.metres(lead[-1], tc0) < 0.5                                    # the leg starts where the lead ends
     assert pl.to_lines(tc0, lines) < 6.0                                        # TC0 is in the lot
-    assert 12 <= joins.length(lead) <= 21                                       # a few metres, not the 70 m of #27
-    # (GitHub #27) the loop times the player at once when its front is within 10 m before the TC plane: not so here
+    assert 12 <= joins.length(lead) <= 21                                       # a few metres, not the 70 m it once was
+    # the loop times the player at once when its front is within 10 m before the TC plane: not so here
     assert not legplan.at_control(lead + [tuple(p[:2]) for p in g["points"][1:6]], joins.length(lead))
 
 

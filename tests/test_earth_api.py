@@ -1,4 +1,4 @@
-"""API or internals (GitHub #51): what Dakar asks of BeamNG.Earth goes through Earth 1.9.0's modding API (beamngEarth_api)
+"""API or internals: what Dakar asks of BeamNG.Earth goes through Earth 1.9.0's modding API (beamngEarth_api)
 when Earth has it, and through Earth's own internals (1.8.2) when it does not.
 
 earthapi.lua is tested on its own with both Earths, and the extension (core.lua) with a stub of the 1.9.0 API next to the

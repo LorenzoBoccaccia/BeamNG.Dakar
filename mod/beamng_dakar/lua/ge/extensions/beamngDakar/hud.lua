@@ -1,4 +1,4 @@
--- Where the car is, top right of the screen and once a second in the log (GitHub #72): a screenshot then tells the place, and
+-- Where the car is, top right of the screen and once a second in the log: a screenshot then tells the place, and
 -- the log line at the same second has the numbers (world x, y, z, latitude and longitude, the line and the metres along it,
 -- how far off it, the ground under the car, the speed). Pure Lua: core.lua samples the game and draws.
 local M = {}

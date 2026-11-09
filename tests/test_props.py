@@ -50,7 +50,7 @@ def world():
     for leg in edition["legs"]:
         g = json.load(open(os.path.join(EDITION, "geometry", leg["id"] + ".json")))
         by_leg[leg["id"]] = legs.toWorld(conv(rt, g["points"]), anchor)
-    # the split checkpoints' distances, as core.lua takes them from legs.raceNodes (GitHub #37)
+    # the split checkpoints' distances, as core.lua takes them from legs.raceNodes
     ed = conv(rt, edition)
     splits = rt.table()
     for i in range(1, len(ed.legs) + 1):
@@ -125,7 +125,7 @@ def test_the_service_park_is_at_the_start_of_the_transfer(world):
 
 
 def test_the_landmarks_are_tall_far_and_at_the_service_park_the_end_of_the_transfer_and_the_finish(world):
-    # (the stage start's own landmark is the staging area's of the transfer before it, which ends there: GitHub #49)
+    # (the stage start's own landmark is the staging area's of the transfer before it, which ends there: )
     _, by_leg, items = world
     far = [p for p in items if p["far"]]
     towers = [p for p in far if "s_tower" in str(p["shape"])]
@@ -147,7 +147,7 @@ def test_the_landmarks_stand_beside_the_road_not_on_it(world):
 
 
 def test_each_split_checkpoint_has_its_radio_and_medical_boards_and_their_warnings(world):
-    # GitHub #37: the stock stages stand the radio point and medical point boards at a split, warnings before them
+    # the stock stages stand the radio point and medical point boards at a split, warnings before them
     _, by_leg, items = world
     nodes = SPLIT_NODES
     kinds = {}
@@ -164,7 +164,7 @@ def test_each_split_checkpoint_has_its_radio_and_medical_boards_and_their_warnin
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# The staging area at the end of a transfer (GitHub #49): the time control before the special, dressed like the service
+# The staging area at the end of a transfer: the time control before the special, dressed like the service
 # park, so the player can see where it is from the approach
 
 def by_id(items, pid):
@@ -294,7 +294,7 @@ def test_legs_json_picks_the_landmark_side_and_its_reach(world):
 
 
 def test_the_popoli_landmark_stands_on_the_outer_side_of_its_last_bend_by_tc1():
-    # the Svolte di Popoli's TC1, up the SR17 past the left turn the transfer makes onto it (GitHub #55; at the time of #49 it
+    # the Svolte di Popoli's TC1, up the SR17 past the left turn the transfer makes onto it (when this was written it
     # was after a short underpass and a bend to the right)
     popoli = os.path.join(ROOT, "editions", "svolte-di-popoli")
     rt = lupa.LuaRuntime(unpack_returned_tuples=True)

@@ -17,7 +17,7 @@ EARTH = os.environ.get("BEAMNG_EARTH_DIR") or os.path.join(os.path.dirname(ROOT)
 EARTH_EXT = os.path.join(EARTH, "mod", "beamng_earth", "lua", "ge", "extensions").replace("\\", "/")
 DAKAR_EXT = os.path.join(ROOT, "mod", "beamng_dakar", "lua", "ge", "extensions").replace("\\", "/")
 EDITION = os.path.join(ROOT, "editions", "testbed-algarve")
-POPOLI = os.path.join(ROOT, "editions", "svolte-di-popoli")        # (the second edition, GitHub #40)
+POPOLI = os.path.join(ROOT, "editions", "svolte-di-popoli")        # (the second edition)
 
 if not os.path.isdir(EARTH_EXT):
     pytest.skip("BeamNG.Earth not found (set BEAMNG_EARTH_DIR)", allow_module_level=True)
@@ -107,10 +107,10 @@ MISSION = { missionTypeData = { dakarEdition = 'testbed-algarve' }, startTrigger
 MISSION_POPOLI = { missionTypeData = { dakarEdition = 'svolte-di-popoli' }, startTrigger = {}, fgVariables = {}, defaultUserSettings = { setupModuleVehicles = 1 } }
 STARTED, STARTED_ARGS, FOREGROUND, STOPPED = false, nil, nil, false
 -- the loops of the installed editions, by id (the prefix of each edition's missions)
--- (a leg's own mission, rallyStage / rallyRoadSection, is a table of its own: LEG_MISSIONS[id], GitHub #76)
+-- (a leg's own mission, rallyStage / rallyRoadSection, is a table of its own: LEG_MISSIONS[id])
 LEG_MISSIONS = {}
 -- as the game's missions.lua: the list of missions is read once (LISTED: false, an add-on mounted after it was read, until
--- clearCache), and getLocations copies a mission's start the first time it is asked (GitHub #1)
+-- clearCache), and getLocations copies a mission's start the first time it is asked
 LISTED, MOUNTED, LIST_CLEARS, POI_CLEARS, LOCATIONS = true, true, 0, 0, {}
 gameplay_missions_missions = { getMissionById = function(id)
   if not LISTED then return nil end
@@ -208,7 +208,7 @@ def lua():
     for leg in edition["legs"]:
         g = json.load(open(os.path.join(EDITION, "geometry", leg["id"] + ".json")))
         put(base + "geometry/%s.json" % leg["id"], conv(rt, g))
-        closures = os.path.join(EDITION, "closures", leg["id"] + ".json")      # (a special stage's closed side roads, #33)
+        closures = os.path.join(EDITION, "closures", leg["id"] + ".json")      # (a special stage's closed side roads)
         if os.path.isfile(closures):
             put(base + "closures/%s.json" % leg["id"], conv(rt, json.load(open(closures))))
         if leg is edition["legs"][0]:           # the player stands at the service park: the first leg's first point
@@ -520,7 +520,7 @@ def test_a_start_outside_ours_is_stopped_and_done_again_properly(lua):
 
 
 def test_the_loading_screen_comes_down_and_the_restart_waits_for_the_player_position(lua):
-    # A start from the main menu (GitHub #19): the stopped mission's flowgraph never took the loading screen down, and
+    # A start from the main menu: the stopped mission's flowgraph never took the loading screen down, and
     # Earth did not know the player yet.
     lua.execute("core.onExtensionLoaded()")
     lua.execute("FADEOUTS = 0; server = { fadeoutLoadingScreen = function(skip) FADEOUTS = FADEOUTS + 1; SKIPPED = skip end }")
@@ -536,19 +536,19 @@ def test_the_loading_screen_comes_down_and_the_restart_waits_for_the_player_posi
     lua.execute("PLAYER_LL = SAVED_LL")
     lua.execute("core.onUpdate(1)")
     assert logs(lua, "restarting the loop through the Dakar start") and lua.eval("STARTS") == 1
-    # (GitHub #21: the hold was let go with the stop: Earth puts the player on the ground again, where it is)
+    # (the hold was let go with the stop: Earth puts the player on the ground again, where it is)
     assert logs(lua, "put on the ground again") and lua.eval("TELEPORT[1]") == lua.eval("PLAYER_LL[1]")
 
 
 def test_a_main_menu_start_loads_the_level_then_teleports_to_the_service_park_and_starts_there(lua):
-    # GitHub #23: the menu's mission list (startWithLoadingLevel) ran the loop at Earth's random place: no car, no ground
+    # the menu's mission list (startWithLoadingLevel) ran the loop at Earth's random place: no car, no ground
     lua.execute("core.onExtensionLoaded()")
     lua.execute("LEVEL = nil; EARTH_IN_LEVEL = false; ANCHOR_LL_SAVED = ANCHOR_LL; ANCHOR_LL = nil")      # the main menu
     lua.execute("PLAYER_LL = { 48.25, -79.06 }")                       # where the random place will be
     lua.execute("gameplay_missions_missionManager.startWithLoadingLevel(MISSION, nil, nil, 'gameplaySelector')")
     assert lua.eval("LEVEL_STARTS") == 0                               # the stock chain did not run
     assert lua.eval("FREEROAM[1]") == "beamng_earth" and lua.eval("FREEROAM[2]") == "bne_random"    # the pick kept
-    assert lua.eval("LOADING.beamngDakar") is True                     # GitHub #25: behind one loading screen
+    assert lua.eval("LOADING.beamngDakar") is True                     # behind one loading screen
     lua.execute("core.onClientEndMission()")                           # (the menu's level going: not ours, kept)
     assert lua.eval("LOADING.beamngDakar") is True
     lua.execute("core.onUpdate(1)")
@@ -705,7 +705,7 @@ def test_the_corridor_stops_at_the_next_timed_stop_when_it_is_near(lua):
 
 
 def test_the_controls_near_the_player_go_on_the_games_ground_once(lua):
-    # GitHub #31: written at the terrain data's height; Earth has ground only near the player
+    # written at the terrain data's height; Earth has ground only near the player
     launched(lua)
     lua.execute("""
       local rp = RACEPATH
@@ -723,7 +723,7 @@ def test_the_controls_near_the_player_go_on_the_games_ground_once(lua):
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Two editions (GitHub #40): nothing is hardwired to the testbed
+# Two editions: nothing is hardwired to the testbed
 
 def at_popoli(lua):
     """The player at the Svolte di Popoli service park (the first point of its first leg), Earth's anchor near it."""
@@ -773,7 +773,7 @@ def test_every_editions_loop_has_its_start_trigger_on_its_own_service_park(lua):
 
 
 def test_every_legs_mission_has_its_marker_on_the_time_control_that_opens_it(lua):
-    # GitHub #76: the liaisons' and stages' info.json say 0, 0, 0; each marker goes on its leg's first point (TC0, TC1, ...)
+    # the liaisons' and stages' info.json say 0, 0, 0; each marker goes on its leg's first point (TC0, TC1, ...)
     lua.execute("core.onExtensionLoaded()")
     lua.execute("core.onUpdate(3)")
     lua.execute("earthAnchorCommit(42.1700, 13.8300)")
@@ -797,7 +797,7 @@ def test_every_legs_mission_has_its_marker_on_the_time_control_that_opens_it(lua
 
 
 def test_the_marker_the_game_draws_moves_with_the_start(lua):
-    # GitHub #1: the game had already copied the start (getLocations) when Dakar moved it; the marker, the big map and the
+    # the game had already copied the start (getLocations) when Dakar moved it; the marker, the big map and the
     # start check read that copy, and stayed at info.json's 0, 0, 0
     lua.execute("gameplay_missions_missions.getLocations(gameplay_missions_missions.getMissionById("
                 "'beamng_earth/rallyStage/dakar-popoli-ss1'))")
@@ -812,7 +812,7 @@ def test_the_marker_the_game_draws_moves_with_the_start(lua):
 
 
 def test_an_add_on_installed_while_the_game_runs_has_its_activities_without_a_reload(lua):
-    # GitHub #1: the game read its mission list before the add-on was mounted; Ctrl+L was needed to see them
+    # the game read its mission list before the add-on was mounted; Ctrl+L was needed to see them
     lua.execute("LISTED = false")
     lua.execute("core.onExtensionLoaded()")
     lua.execute("earthAnchorCommit(42.1700, 13.8300)")
@@ -828,7 +828,7 @@ def test_an_add_on_installed_while_the_game_runs_has_its_activities_without_a_re
 
 
 def test_the_markers_are_placed_again_when_the_game_reads_its_missions_again(lua):
-    # GitHub #1: a reload of the list (the mod manager ready, another mod) builds the missions again from info.json
+    # a reload of the list (the mod manager ready, another mod) builds the missions again from info.json
     lua.execute("core.onExtensionLoaded()")
     lua.execute("core.onUpdate(3)")
     lua.execute("earthAnchorCommit(42.1700, 13.8300)")
@@ -867,7 +867,7 @@ def test_the_props_are_those_of_the_edition_that_runs(lua):
     assert props and any("fold_table" in str(p.fields.shapeName) for p in props)
     px, py = lua.eval("PLAYER_XY[1]"), lua.eval("PLAYER_XY[2]")
     assert all(math.hypot(p.pos[1] - px, p.pos[2] - py) < 9500 for p in props)       # (9 km: the landmarks)
-    tables = [p for p in props if "fold_table" in str(p.fields.shapeName)]           # (the staging area at TC1 has one too, #49)
+    tables = [p for p in props if "fold_table" in str(p.fields.shapeName)]           # (the staging area at TC1 has one too)
     assert min(math.hypot(t.pos[1] - px, t.pos[2] - py) for t in tables) < 100       # the service park table is at the park
 
 
@@ -894,7 +894,7 @@ def test_the_window_picks_the_edition_its_teleports_go_to(lua):
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# Props on the real ground (GitHub #49)
+# Props on the real ground
 
 def staged(lua, suffix):
     """(shape name, z) of the created props whose shape ends with `suffix`."""

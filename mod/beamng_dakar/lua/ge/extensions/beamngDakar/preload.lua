@@ -1,4 +1,4 @@
--- Stage preload (GitHub #41): the data along a special stage fetched before the player drives it.
+-- Stage preload: the data along a special stage fetched before the player drives it.
 --
 -- BeamNG.Earth's server can prefetch the corridor of a planned route: a `route` message (id, lat0, lon0, lat1, lon1,
 -- download = 'route') is answered with `route_result` (the points of the route its own router plans) and the server

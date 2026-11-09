@@ -1,4 +1,4 @@
-"""Offline tests for preload.lua (GitHub #41): the stage corridor prefetch through Earth's route message.
+"""Offline tests for preload.lua: the stage corridor prefetch through Earth's route message.
 
     python -m pytest tests
 

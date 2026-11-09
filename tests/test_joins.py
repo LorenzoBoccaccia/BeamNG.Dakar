@@ -1,4 +1,4 @@
-"""tools/joins.py, tools/legplan.py and the lot start of tools/parkinglot.py without the network (GitHub #55): a fake road
+"""tools/joins.py, tools/legplan.py and the lot start of tools/parkinglot.py without the network: a fake road
 network stands in for the router, so the joins between legs and the car's start in a parking lot are made and checked
 offline, for any loop (TC0 -> liaison -> TC1 -> special -> TC2 -> liaison -> TC3 -> liaison ...)."""
 import heapq
@@ -111,7 +111,7 @@ POPOLI_LIKE = [
 
 
 def test_a_transfer_that_turns_onto_the_stage_road_ends_past_the_turn():
-    # Popoli (#50, #55): road 1 came down the side road, turned onto the main road and went south to the foot of the hill; the
+    # Popoli: road 1 came down the side road, turned onto the main road and went south to the foot of the hill; the
     # stage started there and went back north. TC1 and the start have to be north of the junction, the transfer driving
     # into them heading north.
     net = Net(POPOLI_LIKE)

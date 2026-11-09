@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bridges and tunnels along a stage's own road, from OpenStreetMap tags (GitHub #61).
+"""Bridges and tunnels along a stage's own road, from OpenStreetMap tags.
 
     python tools/structures.py editions/svolte-di-popoli [leg id ...]
 

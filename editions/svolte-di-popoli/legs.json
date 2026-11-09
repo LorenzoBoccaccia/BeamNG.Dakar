@@ -25,7 +25,7 @@
       ],
       "speedLimitKph": 50,
       "parkingNear": 300,
-      "note": "The service park is the car park on the side road west of the SR17 above the railway. The car starts on an aisle of the lot and TC0 is a few metres ahead of it, inside the lot (GitHub #55). The transfer leaves by the side road and turns onto the SR17 heading north, and TC1 and the stage start stand about 40 m up the SR17 past that turn, so the transfer is driven into TC1 from behind and the stage carries on straight ahead (tools/joins.py checks it). The SR17's underpass under the railway at 42.1710, 13.8247 (OSM way 479181637, tunnel) is blocked in the game (GitHub #50), so neither the transfer nor the stage goes through it."
+      "note": "The service park is the car park on the side road west of the SR17 above the railway. The car starts on an aisle of the lot and TC0 is a few metres ahead of it, inside the lot. The transfer leaves by the side road and turns onto the SR17 heading north, and TC1 and the stage start stand about 40 m up the SR17 past that turn, so the transfer is driven into TC1 from behind and the stage carries on straight ahead (tools/joins.py checks it). The SR17's underpass under the railway at 42.1710, 13.8247 (OSM way 479181637, tunnel) is blocked in the game, so neither the transfer nor the stage goes through it."
     },
     {
       "id": "ss1",

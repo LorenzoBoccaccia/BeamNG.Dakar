@@ -1,5 +1,5 @@
 """tools/stage_closures.py without the network: the junctions of a small synthetic road network along a straight stage
-(GitHub #33). The stage runs 1 km east; a closure is where a side road is shut, a few metres from the stage."""
+. The stage runs 1 km east; a closure is where a side road is shut, a few metres from the stage."""
 import math
 import os
 import sys

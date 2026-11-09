@@ -1,4 +1,4 @@
-"""Stage curation end to end (GitHub #41): the extension with stubbed game and Earth.
+"""Stage curation end to end: the extension with stubbed game and Earth.
 
     python -m pytest tests
 
@@ -30,7 +30,7 @@ GPS_GOT = nil
 package.loaded['beamngEarth/gps'] = { onRouteDownload = function(msg) GPS_GOT = msg end }
 
 -- the terrain: a plane under the stage start (the game's ground), one block of 256 samples at 1 m
--- (GitHub #63: the shaping fixes defects of the data only, so the stage has 4 m spikes, sigma 8 m, where a test puts them: SPIKES_AT)
+-- (the shaping fixes defects of the data only, so the stage has 4 m spikes, sigma 8 m, where a test puts them: SPIKES_AT)
 GC = { x = 0, y = 0, z = 0 }
 SPIKES_AT = {}
 function GROUNDF(x, y)
@@ -217,7 +217,7 @@ def test_a_click_while_the_corridor_is_fetched_is_told_and_the_level_ending_lets
 # --- the ground shaping ---------------------------------------------------------------------------------------------------
 
 def test_the_ground_under_the_stage_is_shaped_on_the_games_own_ground_not_moved_to_the_lines_heights(earth):
-    # (GitHub #47: the line's heights are the offline terrain data; where the game's ground is elsewhere the road stays on
+    # (the line's heights are the offline terrain data; where the game's ground is elsewhere the road stays on
     # it, smoothed, instead of being lifted or dug to the line: the race path's nodes are put on the ground by the loop)
     started(earth)
     x, y, z = put_block_on_stage_start(earth)
@@ -231,7 +231,7 @@ def test_the_ground_under_the_stage_is_shaped_on_the_games_own_ground_not_moved_
 
 
 def test_a_stage_on_ground_without_defects_is_left_exactly_as_earth_made_it(earth):
-    # (GitHub #63: the plane the stage's ground is, a cross slope and a grade included, is relief: not one cell is written, and the
+    # (the plane the stage's ground is, a cross slope and a grade included, is relief: not one cell is written, and the
     # log says that no stretch needed fixing)
     started(earth)
     x, y, z = put_block_on_stage_start(earth, spikes=False)
@@ -293,7 +293,7 @@ def test_an_anchor_change_shapes_the_stage_in_the_new_frame(earth):
 
 
 def test_a_swap_is_shaped_at_the_car_before_the_tapped_call_returns(earth):
-    # (GitHub #59: the car on the stage when Earth swaps the block: the ground under it is the shaped road in the same Lua call, before
+    # (the car on the stage when Earth swaps the block: the ground under it is the shaped road in the same Lua call, before
     # the next physics step, not some frames later)
     started(earth)
     x, y, z = put_block_on_stage_start(earth)

@@ -1,4 +1,4 @@
--- DecalRoads over ground that was shaped (GitHub #61). A DecalRoad is cut to the terrain when it is made or regenerated and is not told
+-- DecalRoads over ground that was shaped. A DecalRoad is cut to the terrain when it is made or regenerated and is not told
 -- when the terrain under it changes; BeamNG.Earth's own re-clip comes from its importing or moving a block. After a shaping job the
 -- DecalRoads of Earth's road group inside the changed boxes are regenerated, so they lie on the new ground.
 --

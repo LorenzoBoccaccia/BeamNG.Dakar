@@ -15,10 +15,10 @@ resampled to at most MAX_STEP_M apart so the Lua side can use them as they are.
 A leg may carry "parkingNear": <metres>: the leg then starts in the best parking lot found within that distance of
 its first via point (tools/parkinglot.py: Overture's parking aisles read with DuckDB), the lot replacing that first via
 point as the one OSRM routes from. The car starts on one of the lot's aisles, facing the exit (where the route leaves the
-lot), and the leg starts at TC0, a few metres ahead of it inside the lot (GitHub #55); the lot is recorded in the leg's
+lot), and the leg starts at TC0, a few metres ahead of it inside the lot; the lot is recorded in the leg's
 geometry file as "servicePark": { lat, lon (the car), spawn { lat, lon, h, bearing }, exit { lat, lon, bearing },
 lead [[lat, lon, h], ...] (the car to TC0), lines (the lot's aisles), booth (the service booth beside the car: gazebos, tables,
-tools and cones, tools/booth.py, GitHub #57), area and buildings (the lot's parking polygons and the buildings near it, which the
+tools and cones, tools/booth.py), area and buildings (the lot's parking polygons and the buildings near it, which the
 booth was checked against) }. The car starts where the lot has room for the booth beside it. Without duckdb or network the leg
 starts at its first via point, with a warning.
 
@@ -27,7 +27,7 @@ a leg that does not run into the next one straight (a transfer that turns onto t
 the way the transfer came) has the join moved along the road, past the turn, and the geometry written to agree.
 
 A special's file also gets "structures": [{"from": m, "to": m, "kind": "bridge"|"tunnel", "way": id}], the bridge and tunnel ways its
-own road is on, metres along the line (tools/structures.py, from OpenStreetMap's tags; GitHub #61).
+own road is on, metres along the line (tools/structures.py, from OpenStreetMap's tags).
 python tools/structures.py <edition> adds just those to files already made.
 
 Needs Pillow and numpy (and duckdb for parkingNear). Network: router.project-osrm.org, s3.amazonaws.com and overpass-api.de (read only).
@@ -131,7 +131,7 @@ def lot_record(it, ll):
         lot["exit"] = {"lat": round(ex[0], 7), "lon": round(ex[1], 7), "bearing": plan["exitBearing"]}
         lot["lead"] = [ll(p) for p in lead]
         lot["lines"] = [[[round(a, 6), round(b, 6)] for a, b in l] for l in it["lot"]["_lines"]]
-        # the service booth beside the car (GitHub #57), made from the lot's polygons and the drive just planned
+        # the service booth beside the car, made from the lot's polygons and the drive just planned
         lot.update(booth.record(sp[:2], lead, it["pts"], it["lot"]["_lines"], it["lot"].get("_area"), it["lot"].get("_buildings"),
                                 height, it["lot"].get("_roads")))
     return lot
@@ -158,7 +158,7 @@ def main():
         if it["lot"]:
             out["servicePark"] = lot_record(it, ll)
         if leg["type"] == "special":
-            # the bridges and tunnels the stage's own road is on, from OpenStreetMap's tags (GitHub #61): the ground shaping
+            # the bridges and tunnels the stage's own road is on, from OpenStreetMap's tags: the ground shaping
             # leaves them alone and meets their ends (tools/structures.py)
             try:
                 found = structures.record(pts)

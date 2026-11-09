@@ -17,7 +17,7 @@ M.SHAPES = {
   finish_entry = RALLY .. 's_rally_signboard_finish_entry.dae',
   finish_board = RALLY .. 's_rally_signboard_finish.dae',
   radio_point  = RALLY .. 's_rally_signboard_radio_point.dae',
-  -- a split checkpoint on a special (GitHub #37): the radio point and medical point boards, the warning boards before
+  -- a split checkpoint on a special: the radio point and medical point boards, the warning boards before
   -- them (as the stock stages stand them)
   radio_warning   = RALLY .. 's_rally_signboard_radio_point_warning.dae',
   medical_point   = RALLY .. 's_rally_signboard_medical_point.dae',
@@ -28,18 +28,18 @@ M.SHAPES = {
   cone         = '/art/shapes/race/cone.dae',
   flag         = '/art/shapes/garage_and_dealership/s_flag_floor_portrait_02.dae',     -- 8 m
   flag_tear    = '/art/shapes/garage_and_dealership/s_flag_floor_teardrop_02.dae',
-  -- the time control of the stock loops (GitHub #49): the Italy loop stands the board at every TC with a table and chairs
+  -- the time control of the stock loops: the Italy loop stands the board at every TC with a table and chairs
   -- beside it, its entry board 8 to 50 m before, and flags down the approach
   tc_board     = RALLY .. 's_rally_signboard_time_control.dae',
   tc_entry     = RALLY .. 's_rally_signboard_time_control_entry.dae',
   -- the landmarks (tall, to be seen from far; `far` in the layout): 9.7 m feather flags and a 15 m tower
   feather      = '/art/shapes/garage_and_dealership/s_flag_floor_feather_01.dae',
   tower        = '/art/shapes/objects/s_tower_01.dae',
-  -- the closure across a side road of a special stage (GitHub #33): the rally road-closure tape the stock stages close their exits
+  -- the closure across a side road of a special stage: the rally road-closure tape the stock stages close their exits
   -- with (red and white, 6 m long from a post at the model's origin along its -y, 1.2 m high; the stock prefabs place it
   -- unscaled and without a collision mesh, and so do we: it is scenery the car can break through)
   closure_tape = RALLY .. 's_tape_road_closure_6m.dae',
-  -- the service booth where the car starts (GitHub #57). The stock rally loops stand their service parks as rows of 3 x 6 m
+  -- the service booth where the car starts. The stock rally loops stand their service parks as rows of 3 x 6 m
   -- gazebos (art/prefabs/p_rally_gazebo_mod_<cover>_3x6.prefab.json of the game: the 3 x 6 cover at the prefab's origin, the
   -- 3 x 3 frame 1.5 m back along the length and the 3 x 3 frame add-on 1.5 m forward, all one orientation) with the folding
   -- table and chair, tool boxes, fire extinguishers, cones and floor flags of the stock service areas
@@ -55,10 +55,10 @@ M.SHAPES = {
   extinguisher         = '/art/shapes/garage_and_dealership/Clutter/clutter_workshop_fire_extinguisher.dae',
 }
 
--- The ground a prop's shape covers, for the check that keeps props off roads (roadcheck.lua, GitHub #59): half its length along the
+-- The ground a prop's shape covers, for the check that keeps props off roads (roadcheck.lua): half its length along the
 -- model's x and half its width along the model's y, in metres (estimates from the shapes' sizes; the gazebo's cover is 3 x 6 m
 -- with its long side along x and its frames 3 x 3 m). A kind without one is not checked: the closure tape stands across a side
--- road on purpose (GitHub #33).
+-- road on purpose.
 M.FOOTPRINTS = {
   start_board = { 1.0, 0.3 }, finish_entry = { 1.0, 0.3 }, finish_board = { 1.0, 0.3 }, radio_point = { 1.0, 0.3 },
   radio_warning = { 1.0, 0.3 }, medical_point = { 1.0, 0.3 }, medical_warning = { 1.0, 0.3 }, tc_board = { 1.0, 0.3 },
@@ -73,7 +73,7 @@ M.FOOTPRINTS = {
 -- The footprint of a prop kind { half length, half width }, or nil when it is not kept off roads.
 function M.footprint(kind) return M.FOOTPRINTS[kind] end
 
--- The props that do a job where they stand (GitHub #61: the first run of the road check deleted the stage's own start boards and
+-- The props that do a job where they stand (the first run of the road check deleted the stage's own start boards and
 -- sensors, the park tower and the staging cones, because the game's navgraph gave the SR17 a half width of 5 m and the boards stand 5.5 m
 -- from its line): a start without its boards is wrong. A prop of these kinds that is on a road is pushed out along the road's normal, up
 -- to PUSH_MAX_M, until its footprint clears the road and the margin; only when that fails is it dropped. The rest (tables, chairs,
@@ -90,7 +90,7 @@ local sqrt, atan2, deg = math.sqrt, math.atan2 or function(y, x) return math.ata
 -- facing: 'driver' = the model's front (+y) toward the oncoming driver (the stock boards at a stage start face against
 -- the direction of travel), 'along' = front along the travel direction, 'out' = front to the side of the road.
 -- `shared` (optional, a leg id): the prop is only there when the leg it is on does not start where that leg ends, see
--- M.place (GitHub #49: the end of a transfer and the start of the special after it are one place, dressed once).
+-- M.place (the end of a transfer and the start of the special after it are one place, dressed once).
 local function def(out, leg, tag, kind, s, lateral, facing, fromEnd, far, shared)
   out[#out + 1] = { id = leg.id .. ':' .. tag, leg = leg.id, kind = kind, shape = M.SHAPES[kind], s = s, lateral = lateral,
     facing = facing or 'driver', fromEnd = fromEnd or false, far = far or false, shared = shared }
@@ -119,7 +119,7 @@ local function cones(out, leg, tag, s0, s1, step, lateral, fromEnd, shared)
   end
 end
 
--- The staging area of a time control (GitHub #49): the board where the control is, a table and chairs beside it, the entry
+-- The staging area of a time control: the board where the control is, a table and chairs beside it, the entry
 -- board before it, flags and cones down the approach and a landmark to see it from afar. `fromEnd` says the approach lies
 -- before the leg's end (the end of a transfer: s counts back from the control); otherwise it is the first metres of the
 -- leg itself, past the control (the start of a special that no transfer leads to).
@@ -167,7 +167,7 @@ function M.layout(edition, splitsByLeg)
     prev = leg
     if leg.type == 'transfer' then
       -- the service park at the start of a transfer: a table and chairs, flags, cones, the time-control board. A transfer
-      -- that starts where another ends (liaisons one after the other, GitHub #55) is dressed by the end of that one (its
+      -- that starts where another ends (liaisons one after the other) is dressed by the end of that one (its
       -- staging area below), as a special that starts where a transfer ends is, so it is not dressed twice.
       def(out, leg, 'tc_in', 'radio_point', 0, 5.5, 'driver', false, false, from)
       def(out, leg, 'table', 'table', 8, 9, 'out', false, false, from)
@@ -178,7 +178,7 @@ function M.layout(edition, splitsByLeg)
       cones(out, leg, 'cone_r', 0, 30, 6, 6.5, false, from)
       cones(out, leg, 'cone_l', 0, 30, 6, -6.5, false, from)
       landmark(out, leg, 'park', 16, -1, false, nil, from)    -- (the service park: seen from far)
-      -- the staging area at the end of the transfer, the time control before the next leg (GitHub #49); legs.json can say
+      -- the staging area at the end of the transfer, the time control before the next leg; legs.json can say
       -- on which side the landmark stands (staging.side 'left' / 'right'), how far from the control (staging.landmarkS)
       -- and from the road (staging.reach); by default it is on the outer side of the last bend
       staging(out, leg, 'stagein', true, leg.staging)
@@ -189,7 +189,7 @@ function M.layout(edition, splitsByLeg)
       def(out, leg, 'sensor_l', 'start_sensor', 0, -4.2, 'driver')
       def(out, leg, 'sensor_r', 'start_sensor', 0, 4.2, 'driver')
       -- (the stage start's landmark and its timekeepers' table and flags are the staging area of the transfer before it
-      -- when it ends here: it carries them, so they are not stood twice, GitHub #49)
+      -- when it ends here: it carries them, so they are not stood twice)
       landmark(out, leg, 'start', 24, 1, false, nil, from)    -- (the stage start)
       staging(out, leg, 'stagestart', false, nil, from)
       cones(out, leg, 'start_cone_r', 12, 36, 12, 4.8)
@@ -201,7 +201,7 @@ function M.layout(edition, splitsByLeg)
       landmark(out, leg, 'finish', 30, 1, true)               -- (the finish)
       cones(out, leg, 'fin_cone_r', 12, 48, 12, 4.8, true)
       cones(out, leg, 'fin_cone_l', 12, 48, 12, -4.8, true)
-      -- the split checkpoints: radio and medical point boards side by side, their warnings before (GitHub #37)
+      -- the split checkpoints: radio and medical point boards side by side, their warnings before
       for i, at in ipairs((splitsByLeg and splitsByLeg[leg.id]) or {}) do
         def(out, leg, 'split' .. i .. '_radio', 'radio_point', at, 5.5, 'driver')
         def(out, leg, 'split' .. i .. '_medical', 'medical_point', at, 7.5, 'driver')
@@ -254,7 +254,7 @@ M.yawFor = yawFor
 
 -- The side of the road a landmark at the end of a leg stands on, -1 (left) or 1 (right): the outer side of the bend the
 -- road makes over its last OUTER_SIDE_M metres. From the approach the tower is seen across the bend there, and a hill
--- road's inner side is the bank it is cut into, where a tower would stand against a slope or in the trees (GitHub #49: the
+-- road's inner side is the bank it is cut into, where a tower would stand against a slope or in the trees (the
 -- player could not see where the TC1 of the Svolte di Popoli was, just after a bend and a short tunnel). The heading
 -- change is taken between chords of 40 m, the geometry's points being as close as 10 m. A road that stays straight (under
 -- OUTER_SIDE_MIN_DEG of turn) gets the left, the side of the service park's landmark.
@@ -313,7 +313,7 @@ function M.place(defs, worldByLeg)
 end
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- The closures of a special stage's side roads (GitHub #33; tools/stage_closures.py writes where they go: editions/<ed>/
+-- The closures of a special stage's side roads (tools/stage_closures.py writes where they go: editions/<ed>/
 -- closures/<leg>.json, {closures = {{lat, lon, h, bearing, s, class, width}, ...}}, bearing the side road's direction away from
 -- the stage in degrees clockwise from north, width the metres across to close). Each stands across its side road as the
 -- stock stages do it: one length of road-closure tape, two side by side for a wide road.
@@ -372,7 +372,7 @@ function M.placeClosures(sites, toWorld)
 end
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- The service booth where the car starts (GitHub #57; tools/booth.py makes it from the lot's map data and writes it into the
+-- The service booth where the car starts (tools/booth.py makes it from the lot's map data and writes it into the
 -- first leg's geometry file: servicePark.booth, a list of { kind, variant, lat, lon, h, bearing }, bearing the way the model's
 -- front (+y) points in degrees clockwise from north). A gazebo is three shapes (its cover and two frames) standing together.
 

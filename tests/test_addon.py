@@ -1,4 +1,4 @@
-"""BeamNG.Dakar as a BeamNG.Earth 1.9.0 add-on (GitHub #51): the release file, its layout and its manifest, against what
+"""BeamNG.Dakar as a BeamNG.Earth 1.9.0 add-on: the release file, its layout and its manifest, against what
 Earth's loader checks (server/addons.py at v1.9.0-beta: check_mod_zip, parse_options, _repo_id; server/addonrun.py
 mod_code). Those rules are written out here, not imported: Earth's server code is not run by these tests."""
 import importlib.util

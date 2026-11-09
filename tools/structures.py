@@ -14,6 +14,11 @@ but the line is not on it: it crosses at an angle and the road itself is another
 the nearest drivable way that runs the same way as the line (within ANGLE_DEG of it) for the whole stretch, and the stage's own road
 at that place must not be a way without the tag. A culvert is not a tunnel the road is in.
 
+A tunnel the line does not run in but passes over or beside (the A25's tunnel under the hill the Svolte di Popoli's stage road
+climbs) is recorded as `"tunnelsBeside"`: [{ "from": m, "to": m, "way": <OSM way id> }], the stretches of the line within
+TUNNEL_NEAR_M of a tunnel way's axis. Earth builds the tunnel's tube and portals and shapes the terrain for them (holes at the mouths, the
+ground raised over a low arch), so the ground shaping leaves the ground along those stretches as Earth made it.
+
 Network: overpass-api.de, and api.openstreetmap.org when Overpass does not answer (read only). The matching (spans()) is pure.
 """
 import json
@@ -35,7 +40,9 @@ TIE_M = 1.5                 # a bridge or tunnel way must be this much nearer th
 MERGE_GAP_M = 12.0          # two spans of one kind closer than this along the line are one
 MIN_SPAN_M = 6.0            # a shorter stretch is a mismatch, not a bridge
 CHUNK_M = 1500.0           # the Overpass queries cover the line in pieces this long
-AROUND_M = 30.0
+TUNNEL_NEAR_M = 30.0        # a tunnel way's axis this near the line: Earth's portal holes and arch raise reach about 12 m from the axis, and the shaping
+                            # reaches 11.5 m from the line (shape.CORE_M + shape.BLEND_M), a point of the line 10 m apart
+AROUND_M = TUNNEL_NEAR_M + 5.0
 DRIVABLE = {"motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "service", "track",
             "living_street", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link", "road"}
 NOT_A_TUNNEL = {"no", "culvert", "flooded", "avalanche_protector"}      # (a culvert carries water under the road, not the road)
@@ -158,6 +165,60 @@ def spans(points, ways, sample_m=SAMPLE_M):
     return res
 
 
+def tunnels_beside(points, ways, near_m=TUNNEL_NEAR_M, sample_m=SAMPLE_M):
+    """The stretches of a line within near_m of the axis of a tunnel way (the line's own road included: the ground shaping leaves it alone
+    either way). points: [(lat, lon, ...)]; ways as in spans(). Returns [{"from", "to", "way"}] in metres along the line (0.1 m), in order."""
+    if len(points) < 2:
+        return []
+    lat0, lon0 = points[0][0], points[0][1]
+    mlat, mlon = _scales(lat0)
+
+    def xy(p):
+        return ((p[1] - lon0) * mlon, (p[0] - lat0) * mlat)
+
+    segs = []
+    for w in ways:
+        tags = w.get("tags") or {}
+        if tags.get("highway") not in DRIVABLE or kind_of(tags) != "tunnel":
+            continue
+        g = [xy(p) for p in w["geometry"]]
+        for a, b in zip(g, g[1:]):
+            segs.append((a[0], a[1], b[0], b[1], w["id"]))
+    if not segs:
+        return []
+    line = [xy(p) for p in points]
+    out, s_off, cur = [], 0.0, None
+    for (ax, ay), (bx, by) in zip(line, line[1:]):
+        seg = math.hypot(bx - ax, by - ay)
+        if seg < 1e-6:
+            continue
+        n = max(1, int(math.ceil(seg / sample_m)))
+        for q in range(n):
+            f = (q + 0.5) / n
+            x, y, s = ax + (bx - ax) * f, ay + (by - ay) * f, s_off + seg * f
+            best = None
+            for sx, sy, ex, ey, wid in segs:
+                if min(sx, ex) - near_m > x or max(sx, ex) + near_m < x or min(sy, ey) - near_m > y or max(sy, ey) + near_m < y:
+                    continue
+                d = _seg_dist(x, y, sx, sy, ex, ey)
+                if d <= near_m and (best is None or d < best[0]):
+                    best = (d, wid)
+            if best:
+                if cur and cur["way"] == best[1] and s - cur["to"] <= sample_m * 1.5:
+                    cur["to"] = s + sample_m / 2
+                else:
+                    cur = {"from": max(0.0, s - sample_m / 2), "to": s + sample_m / 2, "way": best[1]}
+                    out.append(cur)
+        s_off += seg
+    merged = []
+    for t in out:
+        if merged and t["from"] - merged[-1]["to"] < MERGE_GAP_M:
+            merged[-1]["to"] = max(merged[-1]["to"], t["to"])
+        else:
+            merged.append(dict(t))
+    return [{"from": round(t["from"], 1), "to": round(min(t["to"], s_off), 1), "way": t["way"]} for t in merged]
+
+
 def fetch_ways(points):
     """The drivable ways near a line, with their tags and geometry, from Overpass (in pieces along the line)."""
     pts = [(p[0], p[1]) for p in points]
@@ -226,15 +287,22 @@ def record(points):
     return spans(points, fetch_ways(points))
 
 
+def record_all(points):
+    """(structures, tunnelsBeside) of a leg's points: one fetch of the ways."""
+    ways = fetch_ways(points)
+    return spans(points, ways), tunnels_beside(points, ways)
+
+
 def update_file(path):
     """Writes the structures into a geometry file, leaving the rest as it is. Returns the list."""
     with open(path, encoding="utf-8") as f:
         geo = json.load(f)
-    found = record(geo["points"])
-    if found:
-        geo["structures"] = found
-    else:
-        geo.pop("structures", None)
+    found, beside = record_all(geo["points"])
+    for key, val in (("structures", found), ("tunnelsBeside", beside)):
+        if val:
+            geo[key] = val
+        else:
+            geo.pop(key, None)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(geo, f, separators=(",", ":"))
     return found
@@ -251,6 +319,9 @@ def main():
         found = update_file(path)
         print("%s: %d structure(s)%s" % (lid, len(found), "".join(
             "\n  %s %.0f..%.0f m (OSM way %s)" % (s["kind"], s["from"], s["to"], s["way"]) for s in found)))
+        beside = json.load(open(path, encoding="utf-8")).get("tunnelsBeside", [])
+        print("%s: %d stretch(es) beside a tunnel%s" % (lid, len(beside), "".join(
+            "\n  %.0f..%.0f m (OSM way %s)" % (s["from"], s["to"], s["way"]) for s in beside)))
 
 
 if __name__ == "__main__":

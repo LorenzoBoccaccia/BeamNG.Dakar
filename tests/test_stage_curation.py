@@ -415,3 +415,103 @@ def test_without_earths_terrain_module_the_loop_still_runs(lua):
     launched(lua)
     assert lua.eval("STARTED") is True
     assert logs(lua, "tap not installed")
+
+
+# --- the ground is shaped behind the loading screen, before the stage starts -----------------------------------------------------
+
+def menu_start_with_block(lua, spikes=True):
+    """A main menu start up to the launch with Earth's terrain block already under the stage's start (spikes of the data at its 4th and
+    7th points): the corridor prefetch is asked for and the loading screen is held."""
+    lua.execute("core.onExtensionLoaded()")
+    lua.execute("LEVEL = nil; EARTH_IN_LEVEL = false; ANCHOR_LL_SAVED = ANCHOR_LL; ANCHOR_LL = nil")
+    lua.execute("gameplay_missions_missionManager.startWithLoadingLevel(MISSION, nil, nil, 'gameplaySelector')")
+    lua.execute("LEVEL = 'beamng_earth'; EARTH_IN_LEVEL = true; ANCHOR_LL = ANCHOR_LL_SAVED")
+    lua.execute("core.onUpdate(1)")
+    lua.execute("earthAnchorCommit(37.0900, -7.9800)")
+    w = lua.eval("(function() local g = JSON['/dakar/editions/testbed-algarve/geometry/ss1.json']; "
+                 "local a = geodesy.newAnchor(37.0900, -7.9800); local w = require('beamngDakar/legs').toWorld(g.points, a); "
+                 "return { w[1][1], w[1][2], w[1][3], w[4][1], w[4][2], w[7][1], w[7][2] } end)()")
+    x, y, z, x4, y4, x7, y7 = [w[i] for i in range(1, 8)]
+    lua.execute("SPIKES_AT = %s; GC = { x = %r, y = %r, z = %r }" % (
+        "{ { %r, %r }, { %r, %r } }" % (x4, y4, x7, y7) if spikes else "{}", x, y, z + 1.5))
+    lua.execute("TB = newBlock(%r, %r, 200.0, true); SNAP = snapshot(TB)" % (x - 100.0, y - 100.0))
+    lua.execute("core.onUpdate(5)")                                   # the settle delay: launch
+    return x, y, z
+
+
+def test_the_stage_is_shaped_behind_the_loading_screen_and_the_loop_start_does_not_do_it_again(earth):
+    menu_start_with_block(earth)
+    # the screen is still up (the corridor is being fetched) and the block already has the stage's spikes out
+    assert earth.eval("STARTS") == 0 and earth.eval("LOADING.beamngDakar") is True
+    run_frames(earth, 3)
+    assert earth.eval("TB.sets") > 500 and earth.eval("sameAs(TB, SNAP)") is False
+    assert logs(earth, "shaping the stage ground behind the loading screen")
+    sets = earth.eval("TB.sets")
+    # the corridor comes in: the launch follows, says what was pre-shaped (metres of line in the block, the work, the time) and starts the loop
+    earth.execute("ROUTE_RESULTS[NET_SENT[1].id] = { points = { { 37.153, -7.887 }, { 37.2338, -8.1733 } }, dist = 40000 }")
+    earth.execute("core.onUpdate(1); package.loaded['beamngEarth/gps'].onRouteDownload({ total = 100, done = 100, active = false })")
+    earth.execute("core.onUpdate(1)")
+    assert earth.eval("STARTS") == 1 and earth.eval("LOADING.beamngDakar") is False
+    done = logs(earth, "stage ground shaped behind the loading screen")
+    assert done and "m of the stage line in the terrain block" in done[0] and "ms of work in" in done[0] and "s of loading screen" in done[0]
+    assert float(done[0].split("stage line")[0].rsplit(": ", 1)[1].split(" m")[0]) > 100       # (metres covered)
+    # the loop's own start sets the same stages: nothing is put back and shaped again
+    earth.execute("core.onAnyMissionChanged('started', MISSION)")
+    run_frames(earth, 40)
+    assert earth.eval("TB.sets") == sets
+    assert len(logs(earth, "cells written along")) == 1
+    # (and the ground along the stage is as shaped: the spikes are not back)
+    assert earth.eval("sameAs(TB, SNAP)") is False
+
+
+def test_a_menu_start_without_the_server_still_waits_for_the_shaping_and_then_launches(earth):
+    earth.execute("NET_CONNECTED = false")
+    menu_start_with_block(earth)
+    assert earth.eval("#NET_SENT") == 0
+    # (the shaping is in the frame of the launch or the next one: the start follows within a few frames)
+    run_frames(earth, 5)
+    assert earth.eval("STARTS") == 1 and earth.eval("LOADING.beamngDakar") is False
+    assert earth.eval("TB.sets") > 500 and logs(earth, "stage ground shaped behind the loading screen")
+
+
+def test_without_a_terrain_block_the_launch_does_not_wait_for_the_shaping(earth):
+    earth.execute("NET_CONNECTED = false")
+    earth.execute("TB = nil")
+    menu_start_to_launch(earth)
+    assert earth.eval("STARTS") == 1
+    assert logs(earth, "stage ground not shaped behind the loading screen")
+
+
+def test_shaping_off_leaves_the_loading_screen_alone(earth):
+    earth.execute("NET_CONNECTED = false")
+    earth.execute("core.onExtensionLoaded(); core.setShaping(false)")
+    menu_start_with_block(earth)
+    assert earth.eval("STARTS") == 1
+    assert earth.eval("sameAs(TB, SNAP)") is True
+    assert not logs(earth, "stage ground") and not logs(earth, "shaping the stage")
+
+
+def test_a_launch_that_gives_up_puts_the_shaped_ground_back(earth):
+    menu_start_with_block(earth)
+    run_frames(earth, 3)
+    assert earth.eval("sameAs(TB, SNAP)") is False
+    earth.execute("core.onClientEndMission()")                          # the level ends while the corridor is fetched
+    run_frames(earth, 5)
+    assert earth.eval("sameAs(TB, SNAP)") is True
+
+
+def test_a_stretch_the_geometry_says_is_beside_a_tunnel_is_not_shaped_and_the_one_beyond_it_is(earth):
+    # (a geometry file may carry "tunnelsBeside": metres along the line within reach of a tunnel's axis, tools/structures.py)
+    earth.execute("JSON['/dakar/editions/testbed-algarve/geometry/ss1.json'].tunnelsBeside = { { from = 10, to = 55, way = 1 } }")
+    started(earth)
+    x, y, z = put_block_on_stage_start(earth)
+    earth.execute("package.loaded['beamngEarth/terrain'].swap('b.ter')")
+    run_frames(earth, 120)
+    nodes = earth.eval("FILES['/gameplay/missions/beamng_earth/rallyStage/dakar-testbed-ss1/rally/drivelineSpline.json'].nodes")
+    untouched = lambda cx, cy: earth.eval(
+        "(function() for dx = -6, 6 do for dy = -6, 6 do local k = math.floor(%r - TB.px + 0.5) + dx + "
+        "(math.floor(%r - TB.py + 0.5) + dy) * 256; if TB.h[k] ~= SNAP[k] then return false end end end; return true end)()"
+        % (cx, cy))
+    assert untouched(nodes[3][1], nodes[3][2]) is True               # the spike 30 m along: beside the tunnel, as Earth made it
+    assert untouched(nodes[5][1], nodes[5][2]) is False              # the spike 90 m along is taken out as ever
+    assert logs(earth, "beside a tunnel left as Earth made them")

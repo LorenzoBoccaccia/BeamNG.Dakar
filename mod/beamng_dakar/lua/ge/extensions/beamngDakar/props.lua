@@ -87,35 +87,45 @@ function M.pushable(kind) return M.PUSHABLE[kind] == true end
 
 local sqrt, atan2, deg = math.sqrt, math.atan2 or function(y, x) return math.atan(y, x) end, math.deg
 
--- facing: 'driver' = the model's front (+y) toward the oncoming driver (the stock boards at a stage start face against
--- the direction of travel), 'along' = front along the travel direction, 'out' = front to the side of the road.
+-- facing: the way the model's local +y is turned, against the direction of travel (the car comes from the side of the
+-- travel direction's back).
+--   'sign'   the rally signboards (start, finish, time control, radio and medical point, their entry and warning boards): their
+--            printed face is the model's -y (the face plane of every s_rally_signboard_*.dae lies at y = 0 with its normal
+--            (0, -1, 0), the slab behind it at y > 0), so the board stands with +y along the travel direction and its face
+--            looks back at the car coming. The stock loops stand them so (every start, finish and split board of the
+--            Italy and Utah loops has its +y along the route's direction).
+--   'driver' +y toward the oncoming driver: the flags, the towers, the start sensors (not boards: a board standing so
+--            shows its back)
+--   'along'  +y along the travel direction, 'out' = +y to the right of the road.
 -- `shared` (optional, a leg id): the prop is only there when the leg it is on does not start where that leg ends, see
 -- M.place (the end of a transfer and the start of the special after it are one place, dressed once).
-local function def(out, leg, tag, kind, s, lateral, facing, fromEnd, far, shared)
+-- `approach` (optional): s is metres from the leg's start along the way the car comes to it (negative: before it), on the
+-- first leg's service park lead, not along the leg itself, see M.place.
+local function def(out, leg, tag, kind, s, lateral, facing, fromEnd, far, shared, approach)
   out[#out + 1] = { id = leg.id .. ':' .. tag, leg = leg.id, kind = kind, shape = M.SHAPES[kind], s = s, lateral = lateral,
-    facing = facing or 'driver', fromEnd = fromEnd or false, far = far or false, shared = shared }
+    facing = facing or 'driver', fromEnd = fromEnd or false, far = far or false, shared = shared, approach = approach or false }
   return out[#out]
 end
 
 -- A landmark: a tower beside the road and feather flags on both sides of it, all `far` (made at a long distance, so the
 -- player can see where to go from kilometres away). side: -1 left, 1 right, or 'auto' (M.place picks the outer side of the
 -- leg's last bend, outerSide); reach: how far from the road the tower stands.
-local function landmark(out, leg, tag, s, side, fromEnd, reach, shared)
+local function landmark(out, leg, tag, s, side, fromEnd, reach, shared, approach)
   reach = reach or 16
-  local tower = def(out, leg, tag .. '_tower', 'tower', s, side == 'auto' and reach or side * reach, 'driver', fromEnd, true, shared)
+  local tower = def(out, leg, tag .. '_tower', 'tower', s, side == 'auto' and reach or side * reach, 'driver', fromEnd, true, shared, approach)
   if side == 'auto' then tower.autoSide = true end
-  def(out, leg, tag .. '_feather_l', 'feather', s - 6, -9, 'driver', fromEnd, true, shared)
-  def(out, leg, tag .. '_feather_r', 'feather', s - 6, 9, 'driver', fromEnd, true, shared)
-  def(out, leg, tag .. '_feather_l2', 'feather', s + 10, -9, 'driver', fromEnd, true, shared)
-  def(out, leg, tag .. '_feather_r2', 'feather', s + 10, 9, 'driver', fromEnd, true, shared)
+  def(out, leg, tag .. '_feather_l', 'feather', s - 6, -9, 'driver', fromEnd, true, shared, approach)
+  def(out, leg, tag .. '_feather_r', 'feather', s - 6, 9, 'driver', fromEnd, true, shared, approach)
+  def(out, leg, tag .. '_feather_l2', 'feather', s + 10, -9, 'driver', fromEnd, true, shared, approach)
+  def(out, leg, tag .. '_feather_r2', 'feather', s + 10, 9, 'driver', fromEnd, true, shared, approach)
 end
 M.landmark = landmark
 
-local function cones(out, leg, tag, s0, s1, step, lateral, fromEnd, shared)
+local function cones(out, leg, tag, s0, s1, step, lateral, fromEnd, shared, approach)
   local n = 0
   for s = s0, s1, step do
     n = n + 1
-    def(out, leg, tag .. n, 'cone', s, lateral, 'along', fromEnd, false, shared)
+    def(out, leg, tag .. n, 'cone', s, lateral, 'along', fromEnd, false, shared, approach)
   end
 end
 
@@ -131,7 +141,7 @@ M.STAGING_LANDMARK_S = 10        -- the landmark's tower this far from the contr
 M.STAGING_LANDMARK_REACH = 16    -- and this far from the road
 local function staging(out, leg, tag, fromEnd, opts, shared)
   opts = opts or {}
-  if fromEnd then def(out, leg, tag .. '_tc', 'tc_board', 0, 5.5, 'driver', fromEnd, false, shared) end
+  if fromEnd then def(out, leg, tag .. '_tc', 'tc_board', 0, 5.5, 'sign', fromEnd, false, shared) end
   -- the timekeepers' table, as the stock ones: a table with two chairs behind it, beside the road
   def(out, leg, tag .. '_table', 'table', 8, 9, 'out', fromEnd, false, shared)
   def(out, leg, tag .. '_chair1', 'chair', 6.6, 9.6, 'out', fromEnd, false, shared)
@@ -145,7 +155,7 @@ local function staging(out, leg, tag, fromEnd, opts, shared)
   if not fromEnd then return end
   -- (the start of a special has its own boards (the start boards are its time control), cones and landmark: only the
   -- table and the flags are added there)
-  def(out, leg, tag .. '_tc_entry', 'tc_entry', M.STAGING_ENTRY_M, 5.5, 'driver', fromEnd, false, shared)
+  def(out, leg, tag .. '_tc_entry', 'tc_entry', M.STAGING_ENTRY_M, 5.5, 'sign', fromEnd, false, shared)
   cones(out, leg, tag .. '_cone_r', 6, M.STAGING_APPROACH_M, 6, 6.5, fromEnd, shared)
   cones(out, leg, tag .. '_cone_l', 6, M.STAGING_APPROACH_M, 6, -6.5, fromEnd, shared)
   local side = (opts.side == 'left' and -1) or (opts.side == 'right' and 1) or 'auto'
@@ -157,6 +167,8 @@ end
 -- [leg id] = the metres along a special of its split checkpoints (legs.raceNodes), where the radio and medical point
 -- boards stand, their warning boards SPLIT_WARNING_M before.
 M.SPLIT_WARNING_M = 100
+M.PARK_CONE_STEP_M = 4           -- the service park's cones before TC0: every 4 m
+M.PARK_CONE_END_M = 16           -- to this far before it (the lots' leads are 16 to 20 m: the car starts at their far end)
 function M.layout(edition, splitsByLeg)
   local out = {}
   local prev
@@ -166,26 +178,29 @@ function M.layout(edition, splitsByLeg)
     local from = prev and prev.type == 'transfer' and prev.id or nil
     prev = leg
     if leg.type == 'transfer' then
-      -- the service park at the start of a transfer: a table and chairs, flags, cones, the time-control board. A transfer
-      -- that starts where another ends (liaisons one after the other) is dressed by the end of that one (its
-      -- staging area below), as a special that starts where a transfer ends is, so it is not dressed twice.
-      def(out, leg, 'tc_in', 'radio_point', 0, 5.5, 'driver', false, false, from)
-      def(out, leg, 'table', 'table', 8, 9, 'out', false, false, from)
-      def(out, leg, 'chair1', 'chair', 6.6, 9.6, 'out', false, false, from)
-      def(out, leg, 'chair2', 'chair', 9.4, 9.6, 'out', false, false, from)
-      def(out, leg, 'flag1', 'flag', 2, 7.5, 'driver', false, false, from)
-      def(out, leg, 'flag2', 'flag', 14, 7.5, 'driver', false, false, from)
-      cones(out, leg, 'cone_r', 0, 30, 6, 6.5, false, from)
-      cones(out, leg, 'cone_l', 0, 30, 6, -6.5, false, from)
-      landmark(out, leg, 'park', 16, -1, false, nil, from)    -- (the service park: seen from far)
+      -- the service park at the start of a transfer: a table and chairs, flags, cones, the time-control board. The car starts
+      -- on the lot's lead, PARK_LEAD_M or so before the control (TC0), and drives through all of it: all but the board stand
+      -- before the control, along the lead (the approach, negative s), the board at the control where the dressing ends
+      -- and faces the car that arrives. A transfer that starts where another ends (liaisons one after the other) is dressed
+      -- by the end of that one (its staging area below), as a special that starts where a transfer ends is, so it is not
+      -- dressed twice.
+      def(out, leg, 'tc_in', 'radio_point', 0, 5.5, 'sign', false, false, from, true)
+      def(out, leg, 'table', 'table', -8, 9, 'out', false, false, from, true)
+      def(out, leg, 'chair1', 'chair', -6.6, 9.6, 'out', false, false, from, true)
+      def(out, leg, 'chair2', 'chair', -9.4, 9.6, 'out', false, false, from, true)
+      def(out, leg, 'flag1', 'flag', -2, 7.5, 'driver', false, false, from, true)
+      def(out, leg, 'flag2', 'flag', -14, 7.5, 'driver', false, false, from, true)
+      cones(out, leg, 'cone_r', -M.PARK_CONE_STEP_M, -M.PARK_CONE_END_M, -M.PARK_CONE_STEP_M, 6.5, false, from, true)
+      cones(out, leg, 'cone_l', -M.PARK_CONE_STEP_M, -M.PARK_CONE_END_M, -M.PARK_CONE_STEP_M, -6.5, false, from, true)
+      landmark(out, leg, 'park', -12, -1, false, nil, from, true)    -- (the service park: seen from far)
       -- the staging area at the end of the transfer, the time control before the next leg; legs.json can say
       -- on which side the landmark stands (staging.side 'left' / 'right'), how far from the control (staging.landmarkS)
       -- and from the road (staging.reach); by default it is on the outer side of the last bend
       staging(out, leg, 'stagein', true, leg.staging)
     elseif leg.type == 'special' then
       -- the start: boards and the start sensor on both sides, cones leading in
-      def(out, leg, 'start_l', 'start_board', 0, -5.5, 'driver')
-      def(out, leg, 'start_r', 'start_board', 0, 5.5, 'driver')
+      def(out, leg, 'start_l', 'start_board', 0, -5.5, 'sign')
+      def(out, leg, 'start_r', 'start_board', 0, 5.5, 'sign')
       def(out, leg, 'sensor_l', 'start_sensor', 0, -4.2, 'driver')
       def(out, leg, 'sensor_r', 'start_sensor', 0, 4.2, 'driver')
       -- (the stage start's landmark and its timekeepers' table and flags are the staging area of the transfer before it
@@ -195,18 +210,18 @@ function M.layout(edition, splitsByLeg)
       cones(out, leg, 'start_cone_r', 12, 36, 12, 4.8)
       cones(out, leg, 'start_cone_l', 12, 36, 12, -4.8)
       -- the finish: the entry board before the line, the finish boards on the line, cones along the last metres
-      def(out, leg, 'fin_entry', 'finish_entry', 250, 5.5, 'driver', true)
-      def(out, leg, 'fin_l', 'finish_board', 0, -5.5, 'driver', true)
-      def(out, leg, 'fin_r', 'finish_board', 0, 5.5, 'driver', true)
+      def(out, leg, 'fin_entry', 'finish_entry', 250, 5.5, 'sign', true)
+      def(out, leg, 'fin_l', 'finish_board', 0, -5.5, 'sign', true)
+      def(out, leg, 'fin_r', 'finish_board', 0, 5.5, 'sign', true)
       landmark(out, leg, 'finish', 30, 1, true)               -- (the finish)
       cones(out, leg, 'fin_cone_r', 12, 48, 12, 4.8, true)
       cones(out, leg, 'fin_cone_l', 12, 48, 12, -4.8, true)
       -- the split checkpoints: radio and medical point boards side by side, their warnings before
       for i, at in ipairs((splitsByLeg and splitsByLeg[leg.id]) or {}) do
-        def(out, leg, 'split' .. i .. '_radio', 'radio_point', at, 5.5, 'driver')
-        def(out, leg, 'split' .. i .. '_medical', 'medical_point', at, 7.5, 'driver')
-        def(out, leg, 'split' .. i .. '_radio_w', 'radio_warning', at - M.SPLIT_WARNING_M, 5.5, 'driver')
-        def(out, leg, 'split' .. i .. '_medical_w', 'medical_warning', at - M.SPLIT_WARNING_M, 7.5, 'driver')
+        def(out, leg, 'split' .. i .. '_radio', 'radio_point', at, 5.5, 'sign')
+        def(out, leg, 'split' .. i .. '_medical', 'medical_point', at, 7.5, 'sign')
+        def(out, leg, 'split' .. i .. '_radio_w', 'radio_warning', at - M.SPLIT_WARNING_M, 5.5, 'sign')
+        def(out, leg, 'split' .. i .. '_medical_w', 'medical_warning', at - M.SPLIT_WARNING_M, 7.5, 'sign')
       end
     end
   end
@@ -243,14 +258,23 @@ local function pointAt(w, c, s)
   return x, y, z, dx, dy
 end
 
--- Yaw in degrees counter-clockwise from +x for the model to face as asked, given the direction of travel (dx, dy).
+-- Yaw in degrees counter-clockwise from +x for the model to face as asked, given the direction of travel (dx, dy): the turn of
+-- the model about +z that takes its local +y to heading + yaw - 90 (setPropPose turns the yaw into the object's rotation).
 local function yawFor(facing, dx, dy)
   local heading = deg(atan2(dy, dx))
-  if facing == 'along' then return heading - 90 end      -- front (+y) along the travel direction
+  if facing == 'along' or facing == 'sign' then return heading - 90 end   -- +y along the travel direction (a board's face, -y, to the car)
   if facing == 'out' then return heading + 180 end       -- front to the right of the road (toward the roadside)
   return heading + 90                                     -- 'driver': front against the travel direction
 end
 M.yawFor = yawFor
+
+-- The orientation setPosRot takes for a yaw (degrees counter-clockwise from +x): the game's own quaternion, the conjugate of the
+-- textbook turn (its `q * v` is v - w t + q x t, t = 2 q x v: a quaternion with z = sin(a/2) takes +y to the compass bearing
+-- a, clockwise), so a counter-clockwise turn of yaw is z = -sin(yaw/2). Returns x, y, z, w.
+function M.poseQuat(yaw)
+  local h = math.rad(yaw) / 2
+  return 0, 0, -math.sin(h), math.cos(h)
+end
 
 -- The side of the road a landmark at the end of a leg stands on, -1 (left) or 1 (right): the outer side of the bend the
 -- road makes over its last OUTER_SIDE_M metres. From the approach the tower is seen across the bend there, and a hill
@@ -287,24 +311,52 @@ local function sharedPlace(worldByLeg, d)
   return sqrt(dx * dx + dy * dy) <= M.SHARED_M
 end
 
+-- Where an approach prop stands: `s` (negative: before the leg's start) metres back along the way the car comes to the leg's
+-- first point. The first leg of a loop that starts in a parking lot has that way: its lead (the car's way from its spawn to TC0,
+-- TC0 being its last point; world points), carried on straight past the spawn by the same line (a metre or two of the park's
+-- farthest props). Without a lead the car comes along the leg's own first segment (the stall stands back from TC0 on its
+-- line), extended backwards. Returns x, y, z, dx, dy (the direction of travel there).
+local function approachAt(w, lead, cum, s)
+  local back = math.min(s, 0)
+  local path, c
+  if lead and #lead >= 2 then
+    cum.lead = cum.lead or cumulative(lead)
+    path, c = lead, cum.lead
+    local at = c[#c] + back
+    if at >= 0 then return pointAt(path, c, at) end
+    back = at                                            -- (before the lead's first point: on along its first segment)
+    local x, y, z, dx, dy = pointAt(path, c, 0)
+    return x + dx * back, y + dy * back, z, dx, dy
+  end
+  cum.leg = cum.leg or cumulative(w)
+  local x, y, z, dx, dy = pointAt(w, cum.leg, 0)
+  return x + dx * back, y + dy * back, z, dx, dy
+end
+
 -- The layout in the frame of one anchor: { id, leg, kind, shape, x, y, z, yaw } with z the terrain data's height
 -- (the caller puts it on the game's ground). worldByLeg: { [leg id] = list of {x, y, z, ...} } (legs.toWorld). A prop that
--- belongs to another leg's end as well (`shared`) is left out where that leg ends at this one's start.
-function M.place(defs, worldByLeg)
+-- belongs to another leg's end as well (`shared`) is left out where that leg ends at this one's start. leadByLeg (optional):
+-- { [leg id] = the world points of the lot lead that ends at the leg's start } for the props that stand along the approach.
+function M.place(defs, worldByLeg, leadByLeg)
   local cum, sideOf, out = {}, {}, {}
   for _, d in ipairs(defs) do
     local w = worldByLeg[d.leg]
     if w and #w >= 2 and not (d.shared and sharedPlace(worldByLeg, d)) then
       cum[d.leg] = cum[d.leg] or cumulative(w)
       local c = cum[d.leg]
-      local s = d.fromEnd and (c[#c] - d.s) or d.s
-      local x, y, z, dx, dy = pointAt(w, c, s)
+      local x, y, z, dx, dy
+      if d.approach and not d.fromEnd then
+        cum[d.leg .. '#approach'] = cum[d.leg .. '#approach'] or { leg = c }
+        x, y, z, dx, dy = approachAt(w, leadByLeg and leadByLeg[d.leg], cum[d.leg .. '#approach'], d.s)
+      else
+        x, y, z, dx, dy = pointAt(w, c, d.fromEnd and (c[#c] - d.s) or d.s)
+      end
       local lateral = d.lateral
       if d.autoSide then
         sideOf[d.leg] = sideOf[d.leg] or outerSide(w, c)
         lateral = lateral * sideOf[d.leg]
       end
-      x, y = x + lateral * dy, y - lateral * dx              -- right of the direction of travel: (dy, -dx)
+      x, y = x + lateral * dy, y - lateral * dx                -- right of the direction of travel: (dy, -dx)
       out[#out + 1] = { id = d.id, leg = d.leg, kind = d.kind, shape = d.shape, x = x, y = y, z = z,
         yaw = yawFor(d.facing, dx, dy), far = d.far, side = lateral < 0 and -1 or 1 }
     end

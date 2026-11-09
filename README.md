@@ -91,7 +91,9 @@ beamngDakar_core.setAdapt(true)                at a rebase, move the race path w
 The loop's props (service park with table, chairs, flags and cones; start boards and sensors; finish entry and finish
 boards) are defined along each leg in `props.lua` and made only near the player, again at every origin change, each on
 the terrain's height, and put on the ground the game really has once the player is within 400 m (a prop made far away
-cannot know it). The end of every transfer, the time control before the special, has a staging area like the service park:
+cannot know it). The service park's cones, flags, table and chairs stand along the car's way from its stall to TC0, and the
+time-control board at TC0 closes them, its printed face to the car that arrives (every rally signboard has its printed face on
+the model's -y, so it stands with its +y along the way on, as the stock loops stand theirs). The end of every transfer, the time control before the special, has a staging area like the service park:
 the stock time-control board, its entry board 50 m before, a table and chairs, flags and cones down the approach. Tall
 landmarks (a 15 m tower and four 9.7 m feather flags at the service park, that staging area and the finish) are made from
 9 km away so the way is visible from far. The car itself starts in a service booth in the parking lot, as in the stock service

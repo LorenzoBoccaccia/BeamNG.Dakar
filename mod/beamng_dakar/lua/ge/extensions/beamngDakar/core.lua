@@ -562,8 +562,9 @@ local PROP_SNAP_M = 400            -- a prop this close to the player is put on 
 local PROP_SNAP_MIN_M = 0.2          -- (and not touched for less)
 
 local function setPropPose(o, x, y, z, yaw)
-  local h = math.rad(yaw) / 2                   -- yaw counter-clockwise from +x, as Earth's setPosRot quaternion has it
-  o:setPosRot(x, y, z, 0, 0, -math.sin(h), math.cos(h))
+  -- yaw counter-clockwise from +x, as the game's own quaternion has it (props.poseQuat; Earth's setPosRot quaternion)
+  local qx, qy, qz, qw = props.poseQuat(yaw)
+  o:setPosRot(x, y, z, qx, qy, qz, qw)
 end
 
 -- A prop made far from the player gets no ground: the terrain there is not loaded, and it stands at the terrain data's
@@ -769,6 +770,12 @@ local function sceneryReconcile()
   if not scenery.worldByLeg then
     scenery.worldByLeg = {}
     for _, leg in ipairs(st.edition.legs) do scenery.worldByLeg[leg.id] = legs.toWorld(legPoints(leg), st.anchor) end
+    -- the first leg's way in from the car's spawn in the lot (geometry servicePark.lead, ending at TC0): the service park's props
+    -- stand along it, before the control, where the car drives through them
+    scenery.leadByLeg = {}
+    local first = st.edition.legs[1]
+    local lot = first and st.geometry[first.id] and st.geometry[first.id].servicePark
+    if lot and lot.lead and #lot.lead >= 2 then scenery.leadByLeg[first.id] = legs.toWorld(lot.lead, st.anchor) end
   end
   if not scenery.defs then
     -- the split checkpoints' boards stand where legs.raceNodes puts the splits in the race path
@@ -783,7 +790,7 @@ local function sceneryReconcile()
     scenery.defs = props.layout(st.edition, splits)
   end
   local want = {}
-  local placed = props.place(scenery.defs, scenery.worldByLeg)
+  local placed = props.place(scenery.defs, scenery.worldByLeg, scenery.leadByLeg)
   -- the closures across the side roads of the special stages: the same kind of prop, from lat/lon per anchor
   if scenery.sitesFor ~= st.closures then
     scenery.sites, scenery.sitesFor = props.closureSites(st.edition, st.closures), st.closures

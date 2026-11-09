@@ -88,6 +88,18 @@ beamngDakar_core.start('testbed-algarve', true) only teleports to the service pa
 beamngDakar_core.setAdapt(true)                at a rebase, move the race path with Earth's transform (experiment)
 ```
 
+The ground arrows of a liaison and the distance the time-control panel shows (`guide.lua`, `core.lua`): the game plans them
+from the car to the next time control over the navgraph, which BeamNG.Earth only builds for about a kilometre round the player.
+A control kilometres away is outside it, and the planner then goes to the graph point nearest the control in a straight line
+and ends with one straight segment over whatever lies between, so the arrows left the planned road (the log's `liaison ...
+guidance` line says where the car is on the line). When the game sets the liaison's route, the extension plans it again with one
+target on the planned line ahead of the car: the farthest point within 1.5 km along it that the local graph covers, moved on in
+150 m steps as the car drives, and the planner's own cost options, which make service ways, tracks and living streets (the
+navgraph's drivability 0.5 and below) ten times dear. It is a single target, not a chain of waypoints: missing a point of the line
+or leaving it for another road does not matter, the car is led to the line ahead from where it is (the nearest point of the whole
+line while it is off it). The rest of the line beyond the target is added to the planner's distance, again after each
+re-plan the planner makes of its own, so the panel reads the distance along the line to the control.
+
 The loop's props (service park with table, chairs, flags and cones; start boards and sensors; finish entry and finish
 boards) are defined along each leg in `props.lua` and made only near the player, again at every origin change, each on
 the terrain's height, and put on the ground the game really has once the player is within 400 m (a prop made far away

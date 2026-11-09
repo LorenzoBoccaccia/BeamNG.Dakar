@@ -1,4 +1,4 @@
-"""GitHub #72: where the car is, top right and once a second in the log. Pure Lua, needs only lupa."""
+"""where the car is, top right and once a second in the log. Pure Lua, needs only lupa."""
 import re
 from pathlib import Path
 

@@ -50,7 +50,7 @@ The second edition, `editions/svolte-di-popoli`: the Svolte di Popoli hillclimb 
 single special stage, **Svolte di Popoli** in the mission list. A 0.2 km transfer from a car park above contrada
 Canapine to the start on the SR17 (256 m), then the SR17 up its hairpins to San Benedetto in Perillis at the gate of
 the Navelli plateau (723 m): 7.4 km, about 470 m of climb (it.wikipedia: 7.53 km, 250 to 725 m, 6.3 percent). The
-service park and the start are north of the SR17's underpass under the railway, which is blocked in the game (#50). The
+service park and the start are north of the SR17's underpass under the railway, which is blocked in the game. The
 stage's `via` points lie on the SR17 line chained from OpenStreetMap, close enough that OSRM follows its hairpins. Drive
 to the service park (42.1749, 13.8231, above contrada Canapine) and start it from the mission list like the testbed; the BeamNG.Dakar
 window has a button per edition for the teleport. Built with the same tools as the testbed below, on
@@ -114,7 +114,7 @@ A special stage runs on public roads, so every side road that meets it is a way 
 finds them (`editions/<edition>/closures/<leg>.json`) and each is closed 10 m from the stage, across the side road, the way
 the stock stages close their exits: one 6 m length of the stock rally road-closure tape, two side by side on a wide road,
 made near the player like the other props.
-No prop stands on a road (#59: a table stood on the road out of the lot). The props have no collision, so one on a road is
+No prop stands on a road (a table stood on the road out of the lot). The props have no collision, so one on a road is
 scenery the car drives through. When a prop is made, and again whenever the roads changed while the player is within 400 m of it,
 `roadcheck.lua` looks at its footprint (`props.FOOTPRINTS`: the table about 1 m, a gazebo's cover 3 x 1.5 m half sizes, a cone 0.3 m)
 against the game's navgraph (`map.getMap().nodes`, which BeamNG.Earth builds from the roads it streams, a few tiles at a time, so
@@ -124,11 +124,11 @@ and the log says which and how far from the road (once). A gazebo (three shapes)
 stand across side roads on purpose. The boards beside the road (5.5 m) stand on a stage road; on a wider road (Earth's navgraph
 gives the SR17 a half width of 5 m) the props that do a job (the start, finish and time control boards, the start sensors, the
 tower, the cones: `props.PUSHABLE`) are pushed out along the road's normal until their footprint clears the road and the margin,
-4 m at most (#61: the first run deleted the Popoli start's boards and sensors); only when that fails are they dropped, like the
+4 m at most (the first run deleted the Popoli start's boards and sensors); only when that fails are they dropped, like the
 decorations (tables, chairs, flags, gazebos).
 The booth is kept off the other roads round the lot offline as well (`servicePark.roads`, Overture's drivable roads).
 
-### Stage curation (GitHub #41)
+### Stage curation
 
 A special's source line is OSRM's route with the terrain data's heights, which is not a rally road: the router makes
 spurs at its via points and the terrain data puts a hillside's noise into the profile (the Svolte di Popoli's climbs 51
@@ -143,7 +143,7 @@ written to its files:
   600 m and deeper than 8 m, that is a viaduct over a valley or a ridge over a tunnel, its height is the straight line
   across (a geometry file may also carry `"structures": [{"from": m, "to": m, "kind": "bridge"}]`, metres along the
   line, from OpenStreetMap tags: `tools/structures.py <edition>` writes them for the specials, only for the way the
-  stage's own road is on, not for a viaduct that crosses it, #61). The driveline, race path, pace notes and props use it, and the ground shaping its plan (not its heights: the ground is Earth's, #63); the log
+  stage's own road is on, not for a viaduct that crosses it). The driveline, race path, pace notes and props use it, and the ground shaping its plan (not its heights: the ground is Earth's); the log
   of every launch has a `stage curation:` line per special with what it found (spurs, zigzags, spikes, spans, the
   largest grade and height change).
 - **The preload** (`preload.lua`): when a loop with a special starts, Earth's server is asked for the start-to-finish
@@ -156,22 +156,22 @@ written to its files:
   edition are fetched one after the other, and a GPS route the player sets meanwhile takes over from it.
 - **The ground shaping** (`shape.lua`): while the loop runs, every terrain block Earth brings in (taps on
   `terrain.load` and `terrain.swap`) is looked at along the stage and changed, in memory, only where the elevation data
-  has a defect the road does not, and nowhere else: every other cell of the road is as Earth made it (#63). Earth paints
+  has a defect the road does not, and nowhere else: every other cell of the road is as Earth made it. Earth paints
   the asphalt into the ground photo and draws the centre and edge lines as a mesh 2.5 cm over its own ground, which does
-  not follow ours, so every cell we moved buried the lines or left them floating (#61). What is fixed, found on the game's
+  not follow ours, so every cell we moved buried the lines or left them floating. What is fixed, found on the game's
   own ground under the curated line (its plan; not its heights, which are the offline terrain data and stood 10 m above
-  the game's ground at the Popoli stage's start, #47):
+  the game's ground at the Popoli stage's start):
   - the ground under an overpass and 20 m past it, where the elevation data has the deck as a ridge (a static collider more
     than 2.5 m over the line, as wide as a road (the same height 2 m to either side of the line), that does not continue
-    from the ground at either end: the A25 over the Svolte di Popoli's SR17, #61): the line there is the straight line
+    from the ground at either end: the A25 over the Svolte di Popoli's SR17): the line there is the straight line
     between the ground beyond, up to 8 m of change;
   - a big spike or dip on the line (curate.despike: 2 m or more off the straight line between the points k steps either
     side of it, median over k = 1 to 4, 10 m steps: a steady grade, a crest of 4 percent change per 10 m and a hillside are
     not; an edition sets its own in legs.json, `"shaping": { "spikeM": 3 }` is the Popoli stage's, whose hairpins are cut
-    into a steep hillside the curated line is a few metres off, #65), with the points within 15 m of it (the taper): the
+    into a steep hillside the curated line is a few metres off), with the points within 15 m of it (the taper): the
     line there is the straight line between the points beyond, up to 4 m of change;
-  - the ground at either end of a deck, met to the deck's top (#61, #69): a bridge OpenStreetMap tags (`structures` in the
-    geometry), and a deck of our own road the game's colliders show, tagged or not (#69: the culvert after the Popoli
+  - the ground at either end of a deck, met to the deck's top: a bridge OpenStreetMap tags (`structures` in the
+    geometry), and a deck of our own road the game's colliders show, tagged or not (the culvert after the Popoli
     underpass). The latter is a run of points under a wide collider (as wide as a road) that stands over the ground, one point
     of it more than 2.5 m, whose top where it begins and where it ends continues from the road beyond it (within 1 m and 8 cm a
     metre of the gap, at either end: an overpass stands metres over the road there), however far its middle stands over a gully, and
@@ -180,10 +180,10 @@ written to its files:
     grade, and the ground ramped to it over the line: a smoothstep as long as the curated road's grade change limit
     (`curate.MAX_GRADE_CHANGE`) asks for that change, 15 m at least, up to 8 m of change, with nothing beyond the end moved (the
     ground under the deck is left). The approach and the exit are the same. A narrow collider (a wall, barrier, rail, pole) is
-    neither a deck nor an end (#65: one taken for a deck at the Popoli stage's first hairpin moved the ground and stranded the
+    neither a deck nor an end (one taken for a deck at the Popoli stage's first hairpin moved the ground and stranded the
     lines);
   - a fix that asks for more than 4 m is not cut off at the cap, which leaves a plateau with the defect's steep sides: its whole
-    delta is scaled to the cap and the remainder is spread over the stretch (#69; the log says it).
+    delta is scaled to the cap and the remainder is spread over the stretch (the log says it).
   A fix is a delta, not a flat core: a cell moves by `w * (the line's fixed height - the ground under the line)` at the
   nearest point of the line, `w` the falloff (1 within 6.5 m of the line, a smoothstep to 0 over the next 12 m), so the cross
   slope and camber and what Earth graded stay and only the defect goes. The delta falls to 0 at the first point past the
@@ -193,18 +193,17 @@ written to its files:
   tunnels themselves are left alone (the curated spans, from the OpenStreetMap tags or found in the profile, and a deck of ours
   the colliders show, 8 m long at least), as the block's rim is. The log names every stretch fixed (its kind, metres along the
   line, the largest change and where: x, y) and every collider over the line and what it was taken for. Where the car is,
-  in the same terms, is shown top right on the Earth level and logged once a second (`where:` lines, `hud.lua`, #72): world
+  in the same terms, is shown top right on the Earth level and logged once a second (`where:` lines, `hud.lua`): world
   x, y, z, latitude and longitude, the ground under the car, the speed, and the nearest line with the metres along it, so a
   screenshot can be matched to the shaping's log.
   It is done again after every commit and anchor change; the originals go back when the loop stops, the switch in the
   BeamNG.Dakar window (or the add-on's option) is turned off, or the extension unloads, when the block is still the one shaped
   (Earth's next commit restores everything by itself anyway). The work is spread over frames (1.5 ms of height maths a frame
   plus the grid update of what it touched, the stretch at the car first and in a bigger first slice after a commit), but the
-  ground under a moving car never changes between two physics frames (#59: at a swap Earth's own ground came back under the
+  ground under a moving car never changes between two physics frames (at a swap Earth's own ground came back under the
   car and our shaping landed some frames later, a step of metres twice). The swap's tap shapes the fixed stretches round the
   car (what it covers in half a second and 22 m more, at most 45 m) in the same Lua call, before the next physics step, to
-  the heights the old block had there (what lies within the freeze radius whatever it costs, the rest only under 7 ms,
-  #61); a later frame, and a restore, leave the cells within 12 m of a car that moves faster than 2 m/s (and what it covers
+  the heights the old block had there (what lies within the freeze radius whatever it costs, the rest only under 7 ms); a later frame, and a restore, leave the cells within 12 m of a car that moves faster than 2 m/s (and what it covers
   in 0.4 s) and do them once it has passed. No cell is moved more than 4 m (8 m under an overpass). The window has the
   switch (on by default) and a line: stretches fixed, cells written, the largest change, how long ago. From the console:
   `beamngDakar_core.setShaping(false)`.

@@ -33,7 +33,7 @@ MOD_SRC = os.path.join(ROOT, "mod", "beamng_dakar")
 EDITIONS = os.path.join(ROOT, "editions")
 NAME = "beamng_dakar"
 # the add-on's file in the mods folder: Earth's Add-ons page names it after the repository (addons.py: <id>.zip, the id
-# the repository's name in lower case), and finds the release's file by its .zip ending (GitHub #51)
+# the repository's name in lower case), and finds the release's file by its .zip ending
 ADDON_ZIP = "beamng-dakar.zip"
 
 
@@ -86,7 +86,7 @@ def install_links(dst):
 
 def mod_files():
     """[(path inside the mod, file here)] of everything the game reads: the mod folder as it is, and each edition's
-    legs.json, geometry/ and closures/ (where a special stage's side roads are closed off, #33) under dakar/editions/.
+    legs.json, geometry/ and closures/ (where a special stage's side roads are closed off) under dakar/editions/.
     The copy install and the add-on zip are both this list, so they cannot differ."""
     out = []
     for base, _dirs, names in os.walk(MOD_SRC):

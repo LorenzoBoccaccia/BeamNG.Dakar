@@ -1,7 +1,7 @@
-"""GitHub #71: the wall of ground at the exit of the short bridge after the A25 underpass (Popoli SS1, deck 330 to 360 m along line 1, a metre
+"""the wall of ground at the exit of the short bridge after the A25 underpass (Popoli SS1, deck 330 to 360 m along line 1, a metre
 over the ground).
 
-PR #70 (GitHub #69) met the ground to a deck's top at its ends with a ramp whose height was the deck's top minus the ground AT THE DECK'S END, the
+met the ground to a deck's top at its ends with a ramp whose height was the deck's top minus the ground AT THE DECK'S END, the
 edge of the ditch under it, and applied that height to the ground of the road beyond, which Earth had already graded to the deck's level: the road
 past the end was raised by the ditch's depth, a face of metres across the road (the game's log: a stretch 'deck end, 360 to 420 m, +2.2 m'). The
 ground past a deck end now follows the deck's top, with the ground of the road beyond measured along it (lowered where it is over the deck, raised
@@ -69,7 +69,7 @@ def test_the_ground_past_a_decks_end_does_not_stand_over_the_deck_when_the_ditch
     scene(lua)
     assert lua.eval("logged('is a deck the road is on, left alone (the ground meets its top at both ends)')")
     p = profile(lua, FROM, 190)
-    # the wall of PR #70: the road past the end raised by the ditch's depth at the end, 2 m over the deck's top line
+    # the wall of the road past the end raised by the ditch's depth at the end, 2 m over the deck's top line
     assert max(z - top(x) for x, z in p) < 0.1
     assert world(lua, FROM, 0) == pytest.approx(top(FROM), abs=0.1)         # (the ground meets the deck's top at its end)
     # ... no step in it, and the grade change of a road

@@ -1,4 +1,4 @@
-"""tools/install.py puts every edition and every edition's missions where the game reads them (GitHub #40: a second
+"""tools/install.py puts every edition and every edition's missions where the game reads them (a second
 edition), by copy and by link."""
 import importlib.util
 import json

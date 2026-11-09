@@ -13,7 +13,7 @@ M.DRIVELINE_TOL_M = 1       -- ...less where the road turns: the line stays with
 -- tracks, and sets each point's height from the terrain block (zSnap.conformSplineGeometry): where Earth's block does not
 -- reach (it covers a couple of kilometres round the car) the terrain answers the block's base height, so a stage's far end
 -- ran hundreds of metres under the race nodes and the pace notes, which keep the heights of the data. core.lua taps that
--- one call and keeps the spline's own heights for a spline with this name (GitHub #66).
+-- one call and keeps the spline's own heights for a spline with this name.
 M.DRIVELINE_NAME = 'BeamNG.Dakar driveline'
 M.ROAD_WIDTH = 10
 -- The route builder wants what the stock loops have (measured on Italy and Utah): the driveline starts 15-25 m before
@@ -23,7 +23,7 @@ M.ROAD_WIDTH = 10
 M.LEAD_IN_M = 22
 M.RUN_OUT_M = 12
 M.LAST_NODE_BEFORE_STOP_M = 30
--- The race nodes (M.raceNodes, GitHub #31 / #37): the first this far along (on the start), a liaison's this wide; a
+-- The race nodes (M.raceNodes): the first this far along (on the start), a liaison's this wide; a
 -- special's split checkpoints every SPLIT_EVERY_M (the stock stages split every 1.5-3 km), none within
 -- SPLIT_MIN_TO_STOP_M of its stop, this wide (the stock 10 m, wider: the source road may be off the drawn one)
 M.LIAISON_FIRST_NODE_M = 0
@@ -201,7 +201,7 @@ end
 -- `keep` (a set of indices into wpts): the points the thinning keeps whatever the spacing. The race nodes are on the line
 -- the game measures the race distance and the progress along, and a node 30 m from the road's last corner but where thinning
 -- cut it off was 12 m beside the line: the game projects it on the line's straight extension, further along, and the
--- liaison of the Popoli loop read 0.10 km for 0.14 (GitHub #66). Where the road turns the nodes come closer (M.DRIVELINE_TOL_M).
+-- liaison of the Popoli loop read 0.10 km for 0.14. Where the road turns the nodes come closer (M.DRIVELINE_TOL_M).
 function M.driveline(leg, wpts, keep)
   local pts = extendEnds(thin(wpts, M.DRIVELINE_STEP_M, keep, M.DRIVELINE_TOL_M), M.LEAD_IN_M, M.RUN_OUT_M)
   local tn = tangents(pts)
@@ -239,7 +239,7 @@ end
 -- car is), on a special a split checkpoint every SPLIT_EVERY_M (none closer than SPLIT_MIN_TO_STOP_M to the stop), and
 -- the node the route builder needs LAST_NODE_BEFORE_STOP_M before the stop; all wide. The driveline gives the distance
 -- and the arrows; on a special the player keeps to the road through the closures at its exits and the pace notes
--- (GitHub #31 liaisons, #37 specials).
+-- (liaisons, specials).
 function M.raceNodes(leg, wpts)
   local total = length(wpts)
   local out = { { at = M.LIAISON_FIRST_NODE_M, split = false } }
@@ -310,10 +310,10 @@ end
 -- The loop's own world positions (the service stall, where the mission puts the car, and its start trigger).
 --
 -- When the first leg starts in a parking lot (tools/fetch_route.py: geometry servicePark.lead, the car's way from its spawn on
--- an aisle of the lot to TC0, a few metres ahead of it and inside the lot, GitHub #55) the stall is the spawn, facing along
+-- an aisle of the lot to TC0, a few metres ahead of it and inside the lot) the stall is the spawn, facing along
 -- the lead: toward the exit, TC0 ahead of the car and nothing behind it to come back for. Otherwise it is backM metres behind
 -- where the first leg begins (TC0), on the line of its first segment, facing it: the stock loops park the car 65-73 m from
--- TC0 (Italy ngrc25 65.3 m, Utah ngrc26 72.8 m); on TC0 itself the loop timed the player at once (GitHub #27). The height
+-- TC0 (Italy ngrc25 65.3 m, Utah ngrc26 72.8 m); on TC0 itself the loop timed the player at once. The height
 -- is TC0's or the lead's: the caller puts it on the game's ground there.
 M.STALL_BACK_M = 70
 M.SPAWN_FACING_M = 6        -- the car faces the way the lead goes over its first metres, not toward its first vertex
@@ -333,7 +333,7 @@ function M.loopPlacement(firstWpts, backM, lead)
 end
 
 -- ---------------------------------------------------------------------------------------------------------------------
--- The joins (GitHub #55): the end of a leg and the start of the next are one place, whatever the legs are (TC0 -> liaison ->
+-- The joins: the end of a leg and the start of the next are one place, whatever the legs are (TC0 -> liaison ->
 -- TC1 -> special -> TC2 -> liaison -> TC3 -> special ..., liaisons after liaisons, specials after specials). The player is
 -- driven into it from behind and goes on the way the next leg goes, so the control that ends a leg (TC_out, SS_stop_control)
 -- and the one that starts the next (TC_in, SS_start_line) face the same way: along the road there. tools/joins.py makes the
@@ -421,7 +421,7 @@ M.facingDeg = facingDeg
 -- placement = loopPlacement, lengths = { [leg id] = metres }, corners = { [special leg id] = the corners its notebook calls },
 -- joins = M.joins (with the leg ids as fromId / toId), markers = every control's heading against its road (M.probeLines) }.
 -- `missionDirOf(leg)` names a leg's mission folder.
--- `curated` (curate.lua, GitHub #41): { [special leg id] = a curated line }; a special with one is built from it (the
+-- `curated` (curate.lua): { [special leg id] = a curated line }; a special with one is built from it (the
 -- race path, the driveline and the pace notes all from the same cleaned line the ground is shaped to), else from its
 -- source geometry.
 function M.materialize(edition, geometry, anchor, missionDirOf, zBias, curated)
@@ -453,7 +453,7 @@ function M.materialize(edition, geometry, anchor, missionDirOf, zBias, curated)
       local facing = facingDeg(sp.rot)
       markers[#markers + 1] = { leg = leg.id, name = sp.name, facing = facing, road = headingDeg(own), off = offDeg(facing, headingDeg(own)) }
     end
-    -- a special is a fixed road, so its corners are known: the co-driver calls them (GitHub #34). A liaison has no notes.
+    -- a special is a fixed road, so its corners are known: the co-driver calls them. A liaison has no notes.
     -- The notebook holds world positions on the same route (and ground bias) as the race path, so it is written per anchor.
     if leg.type == 'special' then
       files[dir .. '/rally/notebooks/' .. M.NOTEBOOK .. '.notebook.json'], notes[leg.id] = pacenotes.notebook(wpts)

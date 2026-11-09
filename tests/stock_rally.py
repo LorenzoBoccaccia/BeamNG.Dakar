@@ -1,4 +1,4 @@
-"""The stock rally loop's distance code, ported to Python from the game's Lua (GitHub #66), so the tests can say what the
+"""The stock rally loop's distance code, ported to Python from the game's Lua, so the tests can say what the
 briefing and the progress bar show for the files Dakar writes.
 
 Ported from BeamNG.drive's lua/ge/extensions:

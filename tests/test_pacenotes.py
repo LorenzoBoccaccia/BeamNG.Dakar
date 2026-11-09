@@ -1,4 +1,4 @@
-"""Offline tests for pacenotes.lua (GitHub #34): the corner scanner and the stock notebook it writes, on synthetic roads.
+"""Offline tests for pacenotes.lua: the corner scanner and the stock notebook it writes, on synthetic roads.
 
     python -m pytest tests
 

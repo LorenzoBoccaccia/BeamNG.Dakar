@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
-"""The service booth where the car starts (GitHub #57): a gazebo beside the car in the parking lot, a table, chairs and tools
+"""The service booth where the car starts: a gazebo beside the car in the parking lot, a table, chairs and tools
 under it, cones and flags round it, and the gazebos of other teams in a row along the aisle.
 
     python tools/booth.py editions/svolte-di-popoli        # (re)make the booth of an edition's geometry, without routing again
 
 The stock rally loops dress a service park with rows of 3 x 6 m gazebos (the BLASTR, NGRC, Rotopad and dark blue covers over
 one frame, as the prefabs of the game's art/prefabs/p_rally_gazebo_mod_*_3x6 stand them), folding tables and chairs, tool
-boxes, fire extinguishers, cones and flags. The player's screenshot of a stock service park (GitHub #57) shows the car at its
+boxes, fire extinguishers, cones and flags. The player's screenshot of a stock service park shows the car at its
 spot beside a gazebo with a table under it and the first time control a little way ahead. This makes that in the lot the loop
 starts in, from what the lot's map data says:
 
-  * the car stays on its aisle, facing the way out with TC0 ahead (GitHub #55), so the drive from the spawn to TC0 and on out of
+  * the car stays on its aisle, facing the way out with TC0 ahead, so the drive from the spawn to TC0 and on out of
     the lot is a plain drive along the aisles and nothing stands on it. Where along the aisles it starts is chosen for the booth:
     parkinglot.spawn_plan takes, among the spots that start toward the exit, one with room beside it for the booth (room() below
     counts the gazebos that fit), the furthest back of the best; the lot's entrance, where the car used to start, is often just
@@ -20,7 +20,7 @@ starts in, from what the lot's map data says:
     other side of the car is tried if that one does not fit, and the gazebo may be moved a little along the aisle;
   * gazebos of other teams follow it along the aisle behind the car (and one ahead), each only where it fits;
   * the table, chairs, tool boxes, extinguisher, cones and flags go in and round the gazebos, each only where it fits too;
-  * nothing stands on a road other than the lot's aisles either (GitHub #59: the player found a table on the road leading out of the lot):
+  * nothing stands on a road other than the lot's aisles either (the player found a table on the road leading out of the lot):
     the roads round the lot (Overture's road segments, written as servicePark.roads) are kept clear by their half width and ROAD_MARGIN_M,
     as the game's runtime check (mod/beamng_dakar/lua/ge/extensions/beamngDakar/roadcheck.lua) does for the roads it knows at play time.
 
@@ -60,7 +60,7 @@ TC0_CLEAR_M = 8.0     # nothing of the booth is nearer than this to TC0, whose o
 FACING_M = 6.0         # the car's way is the chord of its first FACING_M metres (legs.loopPlacement faces it the same way)
 DRIVE_M = 150.0        # the drive that is kept clear: the lead and this much of the leg after TC0
 GRID_M = 1.0           # a footprint is checked every this many metres
-ROAD_MARGIN_M = 0.75   # a prop stands this far outside the half width of a road that is not an aisle (GitHub #59; the runtime check's margin)
+ROAD_MARGIN_M = 0.75   # a prop stands this far outside the half width of a road that is not an aisle (the runtime check's margin)
 
 # what stands in a gazebo, as (kind, along the aisle u, across from the gazebo's middle w, the way its front points); w grows away
 # from the aisle; the front: 'd' along the car's way, 'out' away from the aisle, 'in' toward it, 'b' against the car's way

@@ -1,4 +1,4 @@
--- Pace notes (GitHub #34): the corners of a special stage, read from its geometry, written as the stock structured
+-- Pace notes: the corners of a special stage, read from its geometry, written as the stock structured
 -- notebook the rally loop reads (<mission>/rally/notebooks/structured.notebook.json).
 --
 -- Pure (no game calls). The points are world points {x, y, z} (legs.toWorld), x east and y north, so a turn to the left

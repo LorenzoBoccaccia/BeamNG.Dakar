@@ -1,4 +1,4 @@
-"""GitHub #61: the road surface after the ground shaping.
+"""the road surface after the ground shaping.
 
 BeamNG.Earth (the user's server: near visual 'detail', geotiles, roads in the ground) paints a paved road's asphalt into the ground and
 drapes its centre and edge lines as a mesh per geotile on the ground as the server had it; roads that are DecalRoads are cut to the terrain

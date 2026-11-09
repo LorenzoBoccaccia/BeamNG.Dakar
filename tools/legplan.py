@@ -1,4 +1,4 @@
-"""The legs of an edition as paths that fit together (GitHub #55): what tools/fetch_route.py writes, without the network.
+"""The legs of an edition as paths that fit together: what tools/fetch_route.py writes, without the network.
 
 Given each leg's via points and a router (vias -> a path of (lat, lon)), this makes
 
@@ -63,11 +63,11 @@ def start_in_lot(leg, route_fn, find_lot, log):
     log("%s: starts in a parking lot at %.5f, %.5f (%d aisles, %d m of aisle, %d m from the first point)" % (
         leg["id"], info["lat"], info["lon"], info["aisles"], info["lengthM"], info["distM"]))
     # the lot takes the first via point's place: routed through both, the leg went to that point and back past the lot,
-    # ~1.8 km round the service park before it left (GitHub #29)
+    # ~1.8 km round the service park before it left
     vias = [[info["lat"], info["lon"]]] + via[1:]
     out = route_fn(vias)
     exit_at = parkinglot.exit_of(group, out)
-    # (where the lot's map data is known the car starts where the service booth has room beside it, GitHub #57)
+    # (where the lot's map data is known the car starts where the service booth has room beside it)
     room = booth.room(group, info["_area"], info.get("_buildings")) if "_area" in info else None
     plan = parkinglot.spawn_plan(group, exit_at, room) if exit_at else None
     if not plan:
@@ -87,7 +87,7 @@ ZONE_MARGIN_M = 1.0
 def at_control(pts, ahead):
     """Would a car standing at the start of `pts` facing along it be at a control placed `ahead` metres along it? (The control's
     plane faces the way the path goes there; the car's front is CAR_FRONT_M ahead of its position.) That is what timed the player
-    at once when the stall was on TC0 (GitHub #27): TC0 is put where the car is not already at it."""
+    at once when the stall was on TC0: TC0 is put where the car is not already at it."""
     c = joins.cumulative(pts)
     car = math.radians(joins.heading_between(pts, 0.0, min(6.0, c[-1]), c))
     tc = math.radians(joins.heading_between(pts, ahead, min(ahead + 10.0, c[-1]), c))

@@ -1,4 +1,4 @@
-"""Where one leg of a loop meets the next (GitHub #55): the end of a leg and the start of the leg after it.
+"""Where one leg of a loop meets the next: the end of a leg and the start of the leg after it.
 
 A loop is TC0 -> liaison -> TC1 -> special -> TC2 -> liaison -> TC3 -> special ... and every join is one place: the end of
 a leg (a time control, or a special's stop control) and the start of the next (the next time control, or a special's start

@@ -1,4 +1,4 @@
-"""Offline tests for shape.lua (GitHub #41): the transient ground shaping on a stub TerrainBlock.
+"""Offline tests for shape.lua: the transient ground shaping on a stub TerrainBlock.
 
     python -m pytest tests
 
@@ -282,8 +282,8 @@ def test_a_steep_but_smooth_climb_is_untouched(lua):
 
 
 def test_the_ground_that_is_not_the_roads_own_height_is_not_a_defect_either(lua):
-    # (GitHub #47: the line's heights are the offline terrain data; at the Popoli stage's start they stood 10 m above the game's
-    # ground. The reference is the game's own ground, and nothing of the line's heights is written into it, GitHub #63)
+    # (the line's heights are the offline terrain data; at the Popoli stage's start they stood 10 m above the game's
+    # ground. The reference is the game's own ground, and nothing of the line's heights is written into it)
     lua.execute("BUMPS = {}")
     setup(lua, line="(function() local l = roadLine(40, 216, 0); for i, p in ipairs(l.pts) do p[3] = 110 + 10 * (i % 2) end; return l end)()")
     shape_it(lua)
@@ -304,7 +304,7 @@ def test_a_spike_beside_a_steep_climb_is_found_against_the_climb(lua):
 
 def test_the_road_is_never_moved_further_than_MAX_CHANGE_M(lua):
     # a dip of the ground 10 m deep and 60 m long under the road: a defect of the data bigger than the cap, so the cap holds. It is held
-    # by spreading the change (GitHub #69), not by cutting every cell off at the cap, which leaves a plateau with the dip's steep sides
+    # by spreading the change, not by cutting every cell off at the cap, which leaves a plateau with the dip's steep sides
     lua.execute("BUMPS = {}; GROUND_PLANE = GROUND; "
                 "GROUND = function(x, y) return GROUND_PLANE(x, y) - 10 * math.exp(-((x - 120) ^ 2) / 450) end")
     setup(lua)
@@ -412,7 +412,7 @@ def test_a_commit_between_shaping_and_stopping_leaves_the_old_ground_alone_and_t
     setup(lua)
     shape_it(lua)
     old_sets = lua.eval("TB.sets")
-    # (the new block is shaped at the car at once, GitHub #59, and the stop that follows puts its own heights back)
+    # (the new block is shaped at the car at once, and the stop that follows puts its own heights back)
     lua.execute("TB2 = newBlock({}); SNAP2 = snapshot(TB2); CURRENT = TB2; E:blockChanged(); E:stop()")
     shape_it(lua)
     assert lua.eval("TB.sets") == old_sets                                           # nothing written into the old data
@@ -447,7 +447,7 @@ def test_a_bridge_or_tunnel_span_is_left_alone(lua):
     assert st.skipped >= 8
 
 
-# A bridge the road is on (GitHub #61): the ground falls away under it into a valley (12 m at the middle, from x = 95 to 145) and the
+# A bridge the road is on: the ground falls away under it into a valley (12 m at the middle, from x = 95 to 145) and the
 # deck's top is the road's own height plus a metre, from x = 91 to 149. Where it begins the top continues from the ground before it.
 VALLEY = ("function GROUND(x, y) local z = 100 + 0.02 * x + 0.1 * y; if x > 95 and x < 145 then "
           "local t = math.min((x - 95) / 8, (145 - x) / 8, 1); z = z - 12 * t * t * (3 - 2 * t) end; return z end")
@@ -463,7 +463,7 @@ def test_a_deck_the_road_is_on_is_left_alone_and_its_ends_are_met_without_a_tag(
     assert world(lua, 120, 0) == pytest.approx(lua.eval("GROUND(120, 0)"), abs=1e-6)
     assert world(lua, 125, 0) == pytest.approx(lua.eval("GROUND(125, 0)"), abs=1e-6)
     assert lua.eval("E:status().skipped") >= 4
-    # ... and the ground follows the road we drive (GitHub #69): at the deck's two ends it is at the deck's top, tagged or not
+    # ... and the ground follows the road we drive: at the deck's two ends it is at the deck's top, tagged or not
     top = lambda x: plane(x, 0) + 1.0
     assert world(lua, 92, 0) == pytest.approx(top(92), abs=0.05)         # (the deck begins at x = 91: the first ray that finds it is at 92)
     assert world(lua, 148, 0) == pytest.approx(top(148), abs=0.05)
@@ -499,7 +499,7 @@ def test_a_tagged_span_has_the_ground_meet_the_deck_at_both_ends_too(lua):
 
 
 def test_a_span_the_profile_alone_found_is_left_alone_without_its_ends_met(lua):
-    # (a bridge or tunnel the height profile suggests, not OpenStreetMap: skip is true, not 'tagged', GitHub #65)
+    # (a bridge or tunnel the height profile suggests, not OpenStreetMap: skip is true, not 'tagged')
     lua.execute(VALLEY)
     lua.execute(DECK_ROAD)
     setup(lua)
@@ -510,7 +510,7 @@ def test_a_span_the_profile_alone_found_is_left_alone_without_its_ends_met(lua):
     assert lua.eval("TB.sets") == 0
 
 
-# GitHub #65: the two 'deck ends' a stage with no bridge had were a collider at road level beside or over the road taken for a deck (a
+# the two 'deck ends' a stage with no bridge had were a collider at road level beside or over the road taken for a deck (a
 # retaining wall, a barrier, a rail: Earth builds them all as static colliders), and the ground was pinned to its top, raised or lowered
 # with a 15 m taper, which stranded Earth's road lines.
 NARROW_OVER = "DECK = function(x, y, g) if x > 91 and x < 149 and math.abs(y) < 0.6 then return g + 3 end end"
@@ -610,7 +610,7 @@ def test_a_bump_under_the_spike_limit_is_left_and_an_edition_may_set_its_own_lim
     assert lua.eval("TB.sets") == 0                                                                   # (a higher one leaves the 3 m bumps)
 
 
-# An overpass above the road (GitHub #61): the A25 viaduct over the Svolte di Popoli's SR17. The elevation data has its deck as a 6 m ridge
+# An overpass above the road: the A25 viaduct over the Svolte di Popoli's SR17. The elevation data has its deck as a 6 m ridge
 # across the road, wider than the deck, and the game's collider of the deck stands 10 m above the road.
 RIDGE = ("function GROUND(x, y) return 100 + 0.02 * x + 0.1 * y + 6 * math.exp(-((x - 120) ^ 2) / 200) * math.exp(-(y ^ 2) / 450) end")
 OVERPASS = "DECK = function(x, y, g) if x >= 100 and x <= 140 then return 100 + 0.02 * x + 0.1 * y + 10 end end"
@@ -635,7 +635,7 @@ def test_an_overpass_above_the_line_does_not_stop_the_shaping_and_the_ridge_unde
         assert world(lua, 120, dy) - lua.eval("GROUND(120, %d)" % dy) == pytest.approx(d, abs=1e-6)
     assert lua.eval("logged('1 stretch of the line fixed (1 under an overpass, 0 spikes, 0 deck ends)')")
     assert lua.eval("logged('segments under an overpass')")
-    assert lua.eval("logged(', overpass: ')")                                          # (GitHub #65: told with its place along the line and the world)
+    assert lua.eval("logged(', overpass: ')")                                          # (told with its place along the line and the world)
     assert lua.eval("logged('over the ground at ')") and lua.eval("logged('is an overpass: the road runs under it')")
     # the pad (20 m past the overpass's 100 to 140) is the stretch, and nothing is written past it and the falloff
     x0, x1, y0, y1 = extent(lua)
@@ -691,7 +691,7 @@ def test_a_run_ending_at_the_deck_whose_height_cannot_be_measured_keeps_the_grou
     assert world(lua, 90, 0) == pytest.approx(plane(90, 0), abs=0.05)
 
 
-# GitHub #69: a short bridge over a gully 3.5 m deep that OpenStreetMap does not tag (the culvert of the SR17), on a 6 percent grade with a slight
+# a short bridge over a gully 3.5 m deep that OpenStreetMap does not tag (the culvert of the SR17), on a 6 percent grade with a slight
 # hump, 0.5 m over the road where it lands. The road runs on to it and off it: the ground meets the deck's top at both ends with a ramp that keeps the
 # curated road's grade change (curate.MAX_GRADE_CHANGE), and the gully under the deck is left as it is.
 GRADE6 = ("function GROUND(x, y) local z = 100 + 0.06 * x + 0.1 * y; if x > 95 and x < 125 then "
@@ -780,7 +780,7 @@ def test_a_wall_beside_the_road_over_a_gully_does_not_make_a_deck_or_an_end(lua)
 
 
 def test_the_rays_are_only_cast_near_the_car(lua):
-    # (GitHub #61: a ray a point of the line was most of the plan's cost, and the colliders of Earth's decks exist near the car only)
+    # (a ray a point of the line was most of the plan's cost, and the colliders of Earth's decks exist near the car only)
     lua.execute("NRAYS = 0; DECK = function(x, y, g) NRAYS = NRAYS + 1 end; PLAYER = { x = -580, y = 0 }")
     setup(lua, line="roadLine(-580, 580, 110)", px=-600, py=-600, n=1200)
     shape_it(lua)

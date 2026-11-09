@@ -1,4 +1,4 @@
-"""GitHub #61: the bridges and tunnels of a stage's own road from OpenStreetMap's tags (tools/structures.py), on a synthetic line.
+"""the bridges and tunnels of a stage's own road from OpenStreetMap's tags (tools/structures.py), on a synthetic line.
 
     python -m pytest tests
 """

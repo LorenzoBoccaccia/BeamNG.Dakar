@@ -1,4 +1,4 @@
-"""What the stock rally loop makes of the files Dakar writes (GitHub #66): the briefing's distances and the progress bar's scale.
+"""What the stock rally loop makes of the files Dakar writes: the briefing's distances and the progress bar's scale.
 
 The stock code (tests/stock_rally.py is a port of it) builds a driveline's points from drivelineSpline.json, sets their heights
 from the terrain block, and measures the stage along them: the race distance by projecting the SS start line and the last race

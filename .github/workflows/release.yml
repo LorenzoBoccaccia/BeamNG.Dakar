@@ -1,4 +1,4 @@
-# A release of BeamNG.Dakar is the add-on file BeamNG.Earth 1.9.0's Settings > Add-ons installs (GitHub #51): push a
+# A release of BeamNG.Dakar is the add-on file BeamNG.Earth 1.9.0's Settings > Add-ons installs: push a
 # tag (git tag v0.1.0 && git push origin v0.1.0) and this attaches dist/beamng-dakar.zip to a release of it. Earth takes
 # the newest release that is not a pre-release and has a .zip file, and checks the SHA-256 digest GitHub publishes for
 # the asset, so the name stays beamng-dakar.zip. The add-on only installs from a repository Earth can read: a public one.

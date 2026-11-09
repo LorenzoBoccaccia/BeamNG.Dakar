@@ -1,5 +1,5 @@
 """props.lua's closures across the side roads of a special stage: where the pieces of each stand, from the closures file
-tools/stage_closures.py wrote for the testbed edition (GitHub #33)."""
+tools/stage_closures.py wrote for the testbed edition."""
 import json
 import math
 import os

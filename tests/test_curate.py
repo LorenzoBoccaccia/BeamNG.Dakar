@@ -1,4 +1,4 @@
-"""Offline tests for curate.lua (GitHub #41): a stage's source line cleaned into the line the loop is built on.
+"""Offline tests for curate.lua: a stage's source line cleaned into the line the loop is built on.
 
     python -m pytest tests
 

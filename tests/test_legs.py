@@ -216,8 +216,8 @@ def test_the_ground_bias_moves_every_height_of_the_route(lua, mods):
 
 
 def test_the_service_stall_stands_70_m_before_tc0_facing_it_when_there_is_no_lot(lua, mods):
-    # GitHub #27: the stall on TC0 itself timed the player at once; the stock loops park 65-73 m away. (With a parking lot
-    # the car starts on one of its aisles instead, GitHub #55: tests/test_alignment.py.)
+    # the stall on TC0 itself timed the player at once; the stock loops park 65-73 m away. (With a parking lot
+    # the car starts on one of its aisles instead: tests/test_alignment.py.)
     geodesy, legs = mods
     edition, geo = load()
     for g in geo.values():
@@ -252,7 +252,7 @@ def test_with_a_lot_the_stall_is_the_spawn_on_an_aisle_and_tc0_is_a_few_metres_a
 
 
 def test_a_liaison_has_one_node_on_its_start_and_one_before_its_tc(lua, mods):
-    # GitHub #31: every race node is a fixed waypoint; on a liaison one missed meant "do a U-turn" whichever way
+    # every race node is a fixed waypoint; on a liaison one missed meant "do a U-turn" whichever way
     _, res = materialize(lua, mods, 37.0884, -7.9755)
     road, stage = res["files"]["m/road1/race.race.json"], res["files"]["m/ss1/race.race.json"]
     pn = road["pathnodes"]
@@ -280,7 +280,7 @@ def _seg_dist(p, a, b):
 
 
 def test_a_special_gets_a_stock_notebook_and_a_liaison_none(lua, mods):
-    # GitHub #34: the corners of the stage, read from its geometry, in the notebook the rally manager looks for
+    # the corners of the stage, read from its geometry, in the notebook the rally manager looks for
     _, res = materialize(lua, mods, 37.0884, -7.9755)
     files = res["files"]
     assert "m/road1/rally/notebooks/structured.notebook.json" not in files
@@ -328,7 +328,7 @@ def test_the_notebook_follows_the_anchor_and_the_ground_bias(lua, mods):
 
 
 def test_a_special_has_wide_split_checkpoints_only(lua, mods):
-    # GitHub #37: a dense node on a wonky stretch or under a building was a U-turn trap; the closures at the exits and
+    # a dense node on a wonky stretch or under a building was a U-turn trap; the closures at the exits and
     # the pace notes keep the player on the road, the race path only times them
     _, res = materialize(lua, mods, 37.0884, -7.9755)
     stage = res["files"]["m/ss1/race.race.json"]

@@ -1,4 +1,4 @@
-"""GitHub #59: the bump that smashed the car. The ground under a moving car never changes between two physics frames.
+"""the bump that smashed the car. The ground under a moving car never changes between two physics frames.
 
 At a terrain swap Earth's new block has its own, unshaped ground; our shaping used to land some frames later (the urgent slice
 of 6 ms, then 1.5 ms a frame), so the ground under the moving car went from the shaped road to Earth's and, some frames on,
@@ -71,7 +71,7 @@ def test_a_swap_while_the_car_drives_is_shaped_at_the_car_before_it_returns_to_t
 
 @pytest.mark.parametrize("speed", [60.0, 0.0])
 def test_the_swap_writes_only_the_cells_of_the_stretches_fixed(lua, speed):
-    # (GitHub #63: the block that arrives is Earth's own ground but for the spikes of the line: at a swap, at once and over the frames after
+    # (the block that arrives is Earth's own ground but for the spikes of the line: at a swap, at once and over the frames after
     # it, the cells written are the fixed stretches' (a spike's points 20 m either side, and the falloff round the line), nothing else)
     swap_world(lua, speed)
     lua.execute("SWAP()")
@@ -113,12 +113,12 @@ def test_the_stretch_shaped_at_once_costs_a_few_milliseconds_on_the_stub(lua):
     cost = lua.eval("COST")
     st = lua.eval("E:status()")
     print("sync: %d cells in %.1f ms (the plan included)" % (st.syncCells, cost))
-    assert st.syncCells > 800                              # (GitHub #61: 9358 cells and 24.6 ms at 35 m/s before; GitHub #63: only the spike's cells)
+    assert st.syncCells > 800                              # (9358 cells and 24.6 ms at 35 m/s before: only the spike's cells)
     assert cost < 250                                      # (generous for a loaded machine on plain Lua; LuaJIT measured 7 ms)
 
 
 def test_the_stretch_at_the_car_is_cut_to_the_budget_but_never_inside_what_the_frames_leave_alone(lua):
-    # (GitHub #61: the call costs 1 ms a column on this clock: the freeze radius is done whatever it costs, the rest of the stretch
+    # (the call costs 1 ms a column on this clock: the freeze radius is done whatever it costs, the rest of the stretch
     # only inside SYNC_BUDGET_MS, which the freeze radius alone already spends)
     swap_world(lua, 30.0)
     lua.execute("CLOCK_STEP = 1.0")
@@ -259,7 +259,7 @@ def test_a_session_that_ends_puts_every_height_back_whatever_the_car_does(lua):
     assert lua.eval("sameAs(TB, SNAP)") is True
 
 
-# --- the size of the change: the 8.6 m of #59 -------------------------------------------------------------------------------------
+# --- the size of the change: the 8.6 m once seen ----------------------------------------------------------------------------------
 
 def hillside(lua, slope):
     lua.execute("BUMPS = {}; GROUND = function(x, y) return 100 + 0.02 * x + %r * y end" % slope)
@@ -268,7 +268,7 @@ def hillside(lua, slope):
 
 
 def test_a_hillside_is_relief_and_not_written_even_at_90_percent(lua):
-    # (GitHub #59: a flat core on a 90 percent hillside moved the core's edge 8.6 m; GitHub #63: the road keeps its cross slope, nothing is a defect)
+    # (a flat core on a 90 percent hillside moved the core's edge 8.6 m: the road keeps its cross slope, nothing is a defect)
     hillside(lua, 0.9)
     shape_it(lua)
     assert lua.eval("TB.sets") == 0
@@ -278,7 +278,7 @@ def test_a_hillside_is_relief_and_not_written_even_at_90_percent(lua):
 
 def test_the_largest_change_is_logged_on_the_road_core_and_anywhere_and_the_core_never_moves_more_than_the_cap(lua):
     # a 6 m spike (a defect bigger than the cap) on a hillside of 90 percent across the road: the delta is the spike, the cross slope is not in it.
-    # GitHub #69: the change is spread over the stretch (scaled to the cap) and not cut off at it, so no cell is held at the cap
+    # the change is spread over the stretch (scaled to the cap) and not cut off at it, so no cell is held at the cap
     lua.execute("BUMPS = {}; GROUND = function(x, y) return 100 + 0.02 * x + 0.9 * y + 6 * math.exp(-((x - 100) ^ 2 + y ^ 2) / 128) end")
     setup(lua)
     lua.execute("PLAYER = { x = 5000, y = 5000, speed = 0 }")

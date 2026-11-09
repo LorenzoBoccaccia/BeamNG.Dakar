@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Where the side roads meet a special stage, for closing them off (GitHub #33).
+"""Where the side roads meet a special stage, for closing them off.
 
     python tools/stage_closures.py editions/testbed-algarve
 

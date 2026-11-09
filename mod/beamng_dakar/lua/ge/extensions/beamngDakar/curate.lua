@@ -1,5 +1,5 @@
--- Stage curation (GitHub #41): a special stage's source line (lat, lon, ground height), cleaned into the line the loop
--- is built on and the ground is shaped along (its plan: since GitHub #63 the ground is Earth's own but where a defect of the data is
+-- Stage curation: a special stage's source line (lat, lon, ground height), cleaned into the line the loop
+-- is built on and the ground is shaped along (its plan: since the ground is Earth's own but where a defect of the data is
 -- fixed, so its heights are for the driveline, the race path and the pace notes, which are put on the ground where the car is).
 --
 -- Pure (no game calls). The source is what tools/fetch_route.py wrote: OSRM's route over OpenStreetMap roads, with the
@@ -455,8 +455,8 @@ end
 -- are on both sides) and the median of those departures: a steady grade is no departure at all and a crest or a hillside only a little
 -- (4 percent change of grade per 10 m, the limit of a road, is 1.3 m), where the median-of-heights test of M.profile misses a spike
 -- smaller than the climb's step and flags the points at a profile's end on a steep climb. The ground shaping (shape.lua) uses it, on
--- the game's own ground under the line, to find the defects of the elevation data it fixes (GitHub #63), with a lower SPIKE_M; it
--- used to smooth that profile whole (M.profile, GitHub #47), which moved every cell of the road and stranded Earth's road lines.
+-- the game's own ground under the line, to find the defects of the elevation data it fixes, with a lower SPIKE_M; it
+-- used to smooth that profile whole (M.profile), which moved every cell of the road and stranded Earth's road lines.
 function M.despike(H, opts)
   local o = {}
   for k, v in pairs(M) do if type(v) == 'number' then o[k] = v end end

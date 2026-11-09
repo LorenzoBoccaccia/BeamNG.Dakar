@@ -1,5 +1,5 @@
 # Shapes of the game's own content (content/art_shapes.zip of BeamNG.drive) that this mod may stand as props: every rally
-# asset (the gazebos of the service booth among them, GitHub #57), the cone, the floor flags, the tower and the garage's tool boxes,
+# asset (the gazebos of the service booth among them), the cone, the floor flags, the tower and the garage's tool boxes,
 # tyre rack and the workshop fire extinguisher of the booth. props.SHAPES must name only paths from this list (tests/test_props.py,
 # which also checks them against the install when it is there). Made from the zip's listing; one path per line.
 /art/shapes/garage_and_dealership/Clutter/clutter_workshop_fire_extinguisher.dae

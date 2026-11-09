@@ -197,3 +197,67 @@ def test_earths_1_9_0_taps_are_the_same_as_1_8_2s(api):
     names = {line.rsplit(" ", 1)[1] for line in log}
     assert {"beamngEarth/rebase.moveVehicles", "beamngEarth/mpanchor.announceOwn"} <= names
     assert os.path.isfile(os.path.join(DAKAR_EXT, "beamngDakar", "earthapi.lua"))
+
+
+# --- Earth's GPS and the loop's route guidance are one planner -------------------------------------------------------
+# (a destination left by the player or by the other edition: Earth puts its arrows on core_groundMarkers again at every
+# terrain block swap and adds its planned route's rest to the distance the time-control panel reads)
+
+def test_earthapi_says_where_the_gps_leads_and_clears_whoever_set_it(api):
+    api.execute("ea = require('beamngDakar/earthapi')")
+    assert api.eval("ea.gpsActive()") is None
+    api.execute("GPS = { lat = 42.17, lon = 13.83, name = 'Popoli' }")      # (set by the player, not by us)
+    assert api.eval("ea.gpsActive().name") == "Popoli"
+    assert api.eval("ea.gpsClear()") is True and api.eval("GPS") is None and api.eval("ea.gpsActive()") is None
+
+
+def test_without_the_api_earthapi_uses_earths_own_gps_module_when_it_has_one(lua):
+    lua.execute("ea = require('beamngDakar/earthapi')")
+    assert lua.eval("ea.gpsActive()") is None and lua.eval("ea.gpsClear()") is False
+    lua.execute("""
+      EARTH_GPS = { lat = 42.17, lon = 13.83, name = 'Popoli' }
+      package.loaded['beamngEarth/gps'] = { status = function() return EARTH_GPS end, clear = function() EARTH_GPS = nil end }
+    """)
+    assert lua.eval("ea.gpsActive().name") == "Popoli"
+    assert lua.eval("ea.gpsClear()") is True and lua.eval("EARTH_GPS") is None
+    lua.execute("package.loaded['beamngEarth/gps'] = { status = function() return nil end }")       # (no clear: not a GPS to us)
+    assert lua.eval("ea.gpsActive()") is None and lua.eval("ea.gpsClear()") is False
+    lua.execute("package.loaded['beamngEarth/gps'] = nil")
+
+
+def test_a_destination_left_from_earlier_is_cleared_when_the_loop_starts(api):
+    api.execute("GPS = { lat = 42.17, lon = 13.83, name = 'Popoli' }")      # (the other edition's service park)
+    api.execute("core.start('testbed-algarve')")
+    api.execute("earthAnchorCommit(37.0900, -7.9800); core.onUpdate(5)")
+    assert api.eval("STARTED") is True and api.eval("GPS") is None
+    assert logs(api, "Earth GPS to Popoli") and "GPS was switched off" in str(api.eval("API_MESSAGES[#API_MESSAGES]"))
+
+
+def test_a_destination_set_while_the_loop_runs_is_cleared_at_the_next_check(api):
+    api.execute("core.start('testbed-algarve')")
+    api.execute("earthAnchorCommit(37.0900, -7.9800); core.onUpdate(5)")
+    assert api.eval("STARTED") is True
+    api.execute("API_MESSAGES = {}; GPS = { lat = 42.17, lon = 13.83, name = 'Popoli' }")
+    api.execute("core.onUpdate(0.5)")                                         # (the check is every two seconds)
+    assert api.eval("GPS") is not None
+    api.execute("core.onUpdate(3)")
+    assert api.eval("GPS") is None
+    api.execute("GPS = { lat = 40.0, lon = 10.0, name = 'Again' }; core.onUpdate(3)")
+    assert api.eval("GPS") is None
+    assert len(logs(api, "Earth GPS to")) == 2
+    assert api.eval("#API_MESSAGES") == 1                                      # (told once)
+
+
+def test_the_gps_that_leads_a_far_player_to_the_service_park_is_not_taken_down_before_the_loop_runs(api):
+    api.execute("core.onExtensionLoaded()")
+    api.execute("PLAYER_LL = { 38.7, -9.15 }")
+    api.execute("gameplay_missions_missionManager.startWithFade(MISSION, { a = 1 }, {})")
+    assert api.eval("GPS.lat") == pytest.approx(37.0870, abs=1e-3)
+    api.execute("core.onUpdate(3); core.onUpdate(3)")
+    assert api.eval("GPS.lat") == pytest.approx(37.0870, abs=1e-3)
+
+
+def test_without_a_gps_the_loop_starts_and_runs_as_before(api):
+    api.execute("core.start('testbed-algarve')")
+    api.execute("earthAnchorCommit(37.0900, -7.9800); core.onUpdate(5); core.onUpdate(3)")
+    assert api.eval("STARTED") is True and not logs(api, "Earth GPS to")

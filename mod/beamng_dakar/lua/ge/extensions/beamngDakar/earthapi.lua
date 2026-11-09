@@ -79,6 +79,34 @@ function M.gpsClearIf(lat, lon)
   if g and math.abs((g.lat or 0) - lat) < 1e-6 and math.abs((g.lon or 0) - lon) < 1e-6 then a.gpsClear() end
 end
 
+-- Earth's GPS destination now ({ lat, lon, name, ... }), or nil when there is none: through the API, else through Earth's own
+-- gps module (status / clear): a module without them is no GPS to us.
+local function gpsModule()
+  local g = package.loaded['beamngEarth/gps']
+  if type(g) == 'table' and type(g.status) == 'function' and type(g.clear) == 'function' then return g end
+end
+
+function M.gpsActive()
+  local a = api('gps')
+  if a then
+    local ok, g = pcall(a.gps)
+    return ok and type(g) == 'table' and g.lat and g.lon and g or nil
+  end
+  local g = gpsModule()
+  if not g then return nil end
+  local ok, s = pcall(g.status)
+  return ok and type(s) == 'table' and s.lat and s.lon and s or nil
+end
+
+-- Clear whatever destination Earth's GPS has (whoever set it): true when the call was made.
+function M.gpsClear()
+  local a = api('gps')
+  if a then return (pcall(a.gpsClear)) end
+  local g = gpsModule()
+  if not g then return false end
+  return (pcall(g.clear))
+end
+
 -- A message on screen for seconds.
 function M.notify(text, seconds)
   local a = api('notify')

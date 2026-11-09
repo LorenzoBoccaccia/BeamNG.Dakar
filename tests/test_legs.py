@@ -10,6 +10,8 @@ import os
 
 import pytest
 
+import beamng_quat as bq
+
 lupa = pytest.importorskip("lupa")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -228,9 +230,8 @@ def test_the_service_stall_stands_70_m_before_tc0_facing_it_when_there_is_no_lot
     sp, q = res["placement"]["pos"], res["placement"]["rot"]
     dx, dy = tc0[1] - sp[1], tc0[2] - sp[2]
     assert abs(math.hypot(dx, dy) - 70) < 1e-6
-    yaw = 2 * math.atan2(q[3], q[4])                    # the car's nose (+y turned by yaw) points at TC0
-    fwd = (-math.sin(yaw), math.cos(yaw))
-    assert (dx * fwd[0] + dy * fwd[1]) / 70 > 0.999
+    nose = bq.rotate((q[1], q[2], q[3], q[4]), (0, -1, 0))       # the car's front (local -y), as the game turns the orientation
+    assert (dx * nose[0] + dy * nose[1]) / 70 > 0.999                                     # points at TC0
     edition["serviceStallBackM"] = 40                   # an edition can set its own
     res = legs.materialize(_conv(lua, edition), _conv(lua, geo), anchor, lambda leg: "m/" + leg["id"])
     sp = res["placement"]["pos"]

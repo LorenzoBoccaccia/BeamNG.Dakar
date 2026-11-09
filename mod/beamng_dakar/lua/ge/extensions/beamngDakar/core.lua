@@ -371,6 +371,30 @@ local function clearStartGps()
   st.startGps = nil
 end
 
+-- Earth's GPS and the loop's own route guidance are one planner: both draw their arrows through core_groundMarkers, and
+-- the loop's time-control panel reads the distance to the next control from it (vehicleStoppedNearPlane: the ground
+-- marker's path length, whenever the car is not at the control). Earth's GPS keeps its destination across level starts, puts
+-- its arrows on the planner again every time the navgraph is applied (each terrain block swap) and adds the rest of its
+-- planned road route to the planner's distance: a destination left from earlier (the other edition's service park, 2640 km
+-- away by road) replaced the loop's route at the next block swap and the panel read "TC1 2639.72km". A running loop owns the
+-- ground markers: Earth's GPS is cleared when the loop starts, and again when one is set while it runs (the one Dakar itself
+-- set to lead the player to a service park, st.startGps, is for a loop that is not running).
+local function claimGroundMarkers(why)
+  local g = earthapi.gpsActive()
+  if not g then return false end
+  local s = st.startGps
+  if s and math.abs((g.lat or 0) - s[1]) < 1e-6 and math.abs((g.lon or 0) - s[2]) < 1e-6 then return false end
+  if not earthapi.gpsClear() then return false end
+  ownLog('I', string.format('Earth GPS to %s (%.5f, %.5f, %s) cleared %s: the loop draws its own route to the time controls',
+    tostring(g.name or 'a place'), g.lat or 0, g.lon or 0,
+    g.remaining and string.format('%.0f km to go', g.remaining / 1000) or 'no route yet', why))
+  if not st.gpsTold then
+    st.gpsTold = true
+    earthapi.notify('Dakar: the Earth GPS was switched off; the loop shows its own route to the time controls.', 8)
+  end
+  return true
+end
+
 -- A main menu start keeps the game's loading screen up (our own request tag: it stays while any tag holds it) from the
 -- click until the loop's own start fade, so the level load, Earth's first place, the teleport to the service park, the
 -- terrain and the roads all happen behind it (no freeroam in between). Let go when the loop starts, when
@@ -1462,6 +1486,8 @@ local function launch()
     if not jsonWriteFile(path, data, true) then return ownLog('E', 'could not write ' .. path) end
   end
   stopForeground()
+  st.gpsTold = false
+  claimGroundMarkers('at the start of the loop')
   local id = loopMissionId(st.edition)
   local mission = gameplay_missions_missions.getMissionById(id)
   if not mission then return ownLog('E', 'mission ' .. id .. ' not found (is the mod installed?)') end
@@ -1477,8 +1503,10 @@ local function launch()
   for _, line in ipairs(legs.probeLines(res)) do ownLog('I', line) end
   pl.pos = { pl.pos[1], pl.pos[2], (gzStall or pl.pos[3]) + 0.5 }
   mission.missionTypeData.serviceStallPos = pl.pos
+  -- (two orientations: the stall's is the car's own, set on the vehicle as it is by the loop's move node; the start trigger's
+  -- is the way the car faces as quatFromDir has it, which the game turns into a car's: legs.loopPlacement)
   mission.missionTypeData.serviceStallRot = pl.rot
-  mission.startTrigger.pos, mission.startTrigger.rot = pl.pos, pl.rot
+  mission.startTrigger.pos, mission.startTrigger.rot = pl.pos, pl.dirRot
   if mission.fgVariables then
     mission.fgVariables.serviceStallPos, mission.fgVariables.serviceStallRot = pl.pos, pl.rot
   end
@@ -1739,6 +1767,7 @@ function M.onUpdate(dt)
     end
     local okT, errT = pcall(missionsTick)
     if not okT and not st.missionsWarned then st.missionsWarned = true; ownLog('E', 'mission markers failed: ' .. tostring(errT)) end
+    if scenery.active or st.phase == 'running' then pcall(claimGroundMarkers, 'while the loop runs') end
   end
   local okH, errH = pcall(shapeTick)
   if not okH and not st.shapeWarned then st.shapeWarned = true; ownLog('E', 'ground shaping failed: ' .. tostring(errH)) end

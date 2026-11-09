@@ -17,6 +17,10 @@
 --   * and nothing beside a tunnel: Earth builds a tunnel's tube and portals and shapes the terrain for them (holes at the mouths, the ground
 --     raised over a low arch), so a point of the line near one (the geometry's `tunnelsBeside`, OpenStreetMap's tunnel ways, and the tubes
 --     Earth has made in the game now) is left as Earth made it.
+-- Another road's ground is never moved: the geometry's `otherRoads` (OpenStreetMap's other drivable ways near the line, without the stage's own road, bridges and
+-- tunnels) are kept clear of beyond the stage road's own footprint (CORE_M): the weight of the stage's taper falls to 0 at the other road's edge (its half width and
+-- OTHER_MARGIN_M), over OTHER_FADE_M. A motorway beside the road, a road that crosses it or leaves it keep the ground Earth gave them; the ground under the stage road itself,
+-- a crossing included, follows the stage road.
 -- Only the stage road is worked on: its surface (CORE_M, the road's half width and a little) and the ground directly under it, with a taper
 -- (BLEND_M) just wide enough to blend into the ground beside; other roads, embankments and verges beyond that are Earth's.
 -- Where one of those is, the change is a delta, not a flat core: a cell is moved by w * (the line's fixed height - the ground under
@@ -76,6 +80,8 @@ M.SPIKE_M = 2.0             -- a point of the line is a spike when its ground is
                             -- its own (legs.json: "shaping": { "spikeM": 2.5 })
 M.TUNNEL_KEEP_M = 30        -- a point of the line this near a tunnel's axis (Earth's portal holes and arch raise reach about 12 m from it, the shaping
                             -- CORE_M + BLEND_M from the line, and the line's points are 10 m apart) is left alone, with its segments
+M.OTHER_MARGIN_M = 2        -- another road's ground is its carriageway and shoulders (the geometry's `otherRoads`: a half width each) and this much more
+M.OTHER_FADE_M = 3          -- (a verge, Earth's wall at a cutting); the stage road's taper eases to nothing over this much before it
 M.TUNNEL_POINT_M = 10       -- (the tubes Earth made in the game are known by points along their axes, 20 m apart at most: this much more for the gap)
 M.TAPER_M = 15              -- a fix ends in a taper along the line: the points within this of a spike are fixed with it (the delta
                             -- falls from the spike to the first point beyond, where it is 0)
@@ -157,6 +163,10 @@ local function linesKey(lines)
   for _, line in ipairs(lines) do
     out[#out + 1] = tostring(#line.pts) .. ':' .. tostring(line.spikeM)
     for _, p in ipairs(line.pts) do out[#out + 1] = string.format('%.2f,%.2f', p[1], p[2]) end
+    for _, o in ipairs(line.others or {}) do
+      local a, b = o.pts[1], o.pts[#o.pts]
+      out[#out + 1] = string.format('o%d:%.1f,%.1f,%.1f,%.1f,%.1f', #o.pts, a[1], a[2], b[1], b[2], o.hw or 0)
+    end
     for _, name in ipairs({ 'skip', 'keep' }) do
       local t, ks = line[name], {}
       for k, v in pairs(t or {}) do ks[#ks + 1] = tostring(k) .. '=' .. tostring(v) end
@@ -908,10 +918,73 @@ local function plan(self, tb, info, off)
       end
     end
   end
+  -- the other roads' ground near what is worked on: the segments of their pieces, each in the buckets it touches (with its half width, the margin and the
+  -- fade) where a stage segment reaches too; nothing else is looked at
+  if S.n > 0 then
+    local oa, ob, od, oe, ol2, orad, obk = {}, {}, {}, {}, {}, {}, {}
+    local n = 0
+    for _, line in ipairs(self.lines) do
+      for _, o in ipairs(line.others or {}) do
+        local rad = (o.hw or 3) + M.OTHER_MARGIN_M
+        local reachO = rad + M.OTHER_FADE_M
+        for q = 1, #o.pts - 1 do
+          local a, b = o.pts[q], o.pts[q + 1]
+          local x0, x1 = min(a[1], b[1]) - reachO, max(a[1], b[1]) + reachO
+          local y0, y1 = min(a[2], b[2]) - reachO, max(a[2], b[2]) + reachO
+          local k
+          for bx = floor(x0 / bs), floor(x1 / bs) do
+            for by = floor(y0 / bs), floor(y1 / bs) do
+              local key = bx * 131072 + by
+              if buckets[key] then
+                if not k then
+                  n = n + 1
+                  k = n
+                  oa[k], ob[k], od[k], oe[k] = a[1], a[2], b[1] - a[1], b[2] - a[2]
+                  ol2[k], orad[k] = od[k] * od[k] + oe[k] * oe[k], rad
+                end
+                local list = obk[key]
+                if not list then list = {}; obk[key] = list end
+                list[#list + 1] = k
+              end
+            end
+          end
+        end
+      end
+    end
+    if n > 0 then S.o = { ax = oa, ay = ob, dx = od, dy = oe, l2 = ol2, r = orad, bk = obk, n = n } end
+  end
   local order = {}
   for k = 1, S.n do order[k] = k end
   table.sort(order, function(a, b) return S.near[a] < S.near[b] end)
   return S, buckets, order, skipped, fixes
+end
+
+-- 1 where no other road's ground is near the cell, down to 0 on it (its half width and margin), easing in over OTHER_FADE_M beyond.
+local function otherFactor(O, x, y)
+  local bs = M.BUCKET_M
+  local list = O.bk[floor(x / bs) * 131072 + floor(y / bs)]
+  if not list then return 1 end
+  local fade = M.OTHER_FADE_M
+  local f = 1
+  for q = 1, #list do
+    local k = list[q]
+    local l2 = O.l2[k]
+    local rx, ry = x - O.ax[k], y - O.ay[k]
+    local t = l2 > 1e-9 and (rx * O.dx[k] + ry * O.dy[k]) / l2 or 0
+    if t < 0 then t = 0 elseif t > 1 then t = 1 end
+    local ex, ey = rx - O.dx[k] * t, ry - O.dy[k] * t
+    local r = O.r[k]
+    local lim = r + fade
+    local d2 = ex * ex + ey * ey
+    if d2 < lim * lim then
+      local fk = 1 - M.weight(sqrt(d2), r, fade)
+      if fk < f then
+        f = fk
+        if f <= 0 then return 0 end
+      end
+    end
+  end
+  return f
 end
 
 -- The height a cell at world (x, y), now at `orig` (world height), is given: orig + w * (the delta of the line at the nearest
@@ -959,7 +1032,14 @@ local function target(S, buckets, x, y, orig)
   end
   if one then
     local w = 1
-    if dmin2 > core * core then w = M.weight(sqrt(dmin2), core, blend) end
+    if dmin2 > core * core then
+      w = M.weight(sqrt(dmin2), core, blend)
+      -- (beyond the stage road's own footprint another road's ground is not ours: nothing there, eased out toward it)
+      if w > 0 and S.o then
+        local f = otherFactor(S.o, x, y)
+        if f < 1 then S.kept = (S.kept or 0) + 1; w = w * f end
+      end
+    end
     if w <= 0 then return nil end
     return orig + CZ[best] * w, dmin2, kb
   end
@@ -988,6 +1068,11 @@ local function target(S, buckets, x, y, orig)
     end
   end
   if wmax <= 0 then return nil end
+  if dmin2 > core * core and S.o then
+    local f = otherFactor(S.o, x, y)
+    if f < 1 then S.kept = (S.kept or 0) + 1; wmax = wmax * f end
+    if wmax <= 0 then return nil end
+  end
   return orig + (swz / sw) * wmax, dmin2, kb
 end
 
@@ -1193,10 +1278,10 @@ local function finish(self, job)
       'largest change of the line %.1f m; %d cells written along %d segments in %d frames, %.1f ms, largest change %.1f m (%.1f m on the road core, ' ..
       'within %.1f m of the line); the ground asked for up to %.1f m (%.1f m on the core), %d cells held at %.1f m; ' ..
       'left alone: %d span, %d deck, %d no-ground segments; %d segments under an overpass, %d deck ends met; %.0f m of the line examined in the block, ' ..
-      '%d segments beside a tunnel left as Earth made them', f.n, f.n == 1 and '' or 'es',
+      '%d segments beside a tunnel left as Earth made them; %d cells beside the road kept clear of other roads', f.n, f.n == 1 and '' or 'es',
       f.overpass or 0, f.spike or 0, (f.spike or 0) == 1 and '' or 's', f['deck end'] or 0, (f['deck end'] or 0) == 1 and '' or 's',
       f.length, f.largest, job.cells, job.S.n, job.frames, ms, job.maxChange, job.maxCore, M.CORE_M, job.wantedMax, job.wantedCore,
-      job.capped, M.MAX_CHANGE_M, job.skipped.span, job.skipped.deck, job.skipped.ground, job.skipped.over, job.skipped.pinned, f.covered, job.skipped.tunnel))
+      job.capped, M.MAX_CHANGE_M, job.skipped.span, job.skipped.deck, job.skipped.ground, job.skipped.over, job.skipped.pinned, f.covered, job.skipped.tunnel, job.S.kept or 0))
     -- (where each stretch is, in metres along its line and in the world, and what the colliders over the line were taken for:
     -- the 'deck ends' of a stage with no bridge were a collider the shaping took for a deck, and the log could not say where)
     reportRamps(self, job)

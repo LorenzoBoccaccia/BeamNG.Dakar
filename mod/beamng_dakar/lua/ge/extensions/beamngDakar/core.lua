@@ -991,8 +991,22 @@ local function shapeLines()
           end
         end
       end
+      -- (otherRoads: the pieces of the other roads near the line, from OpenStreetMap, tools/structures.py: their ground is not ours to move)
+      local others
+      local roads = st.geometry[leg.id] and st.geometry[leg.id].otherRoads
+      if roads and #roads > 0 then
+        others = {}
+        for _, o in ipairs(roads) do
+          local pts = {}
+          for k, p in ipairs(o.pts) do
+            local x, y = st.anchor:geodeticToWorld(p[1], p[2], 0)
+            pts[k] = { x, y }
+          end
+          others[#others + 1] = { pts = pts, hw = o.hw }
+        end
+      end
       local cfg = st.edition.shaping
-      lines[#lines + 1] = { pts = w, skip = skip, keep = keep, spikeM = cfg and cfg.spikeM }
+      lines[#lines + 1] = { pts = w, skip = skip, keep = keep, others = others, spikeM = cfg and cfg.spikeM }
     end
   end
   return lines

@@ -32,6 +32,7 @@ local reclip = require('beamngDakar/reclip')
 local preload = require('beamngDakar/preload')
 local earthapi = require('beamngDakar/earthapi')
 local hud = require('beamngDakar/hud')
+local guide = require('beamngDakar/guide')
 
 local EDITIONS_DIR = '/dakar/editions/'                  -- in the mod (tools/install.py copies editions/ there)
 local MISSIONS_DIR = '/gameplay/missions/beamng_earth/'  -- mission ids are <level>/<type>/<name>; the level is Earth's
@@ -604,7 +605,135 @@ local function navNodes()
 end
 
 -- The navgraph was rebuilt (the game's hook, which Earth's map.reset raises): the roads are read again at the next check.
-function M.onNavgraphReloaded() scenery.roads.graphV = scenery.roads.graphV + 1 end
+function M.onNavgraphReloaded()
+  scenery.roads.graphV = scenery.roads.graphV + 1
+  if st.guide then st.guide.dirty = true end      -- (the arrows' path is on the old graph: planned again at the next check)
+end
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Liaison guidance (guide.lua): the arrows lead to a point of the planned liaison line the local navgraph reaches, not to a
+-- time control far outside it. The game's route node (createRallyGroundMarker) plans the arrows from the car through the
+-- race nodes to the time control and raises onCreatedRallyGroundMarkerRoute; for a liaison of ours this takes the planner over
+-- from there: one target on the line ahead of the car, moved on as it drives (so a car that leaves the line, or misses a point
+-- of it, is led back to the line ahead, from where it is), with the minor ways dear, and the distance the panel reads
+-- (the planner's path length) kept as the distance to the control.
+
+local GUIDE_EVERY_S = 1.0
+local GUIDE_MATCH_M = 40          -- the game's route ends this close to a liaison's end (it stops 10 m short of the control)
+
+-- A function (x, y) -> is a navgraph node within guide.ON_GRAPH_M? Built once per check from the nodes as they are then.
+local function guideOnGraph()
+  local nodes = navNodes()
+  local xs, ys, n = {}, {}, 0
+  for _, nd in pairs(nodes or {}) do
+    local p = nd.pos
+    if p then n = n + 1; xs[n], ys[n] = p.x or p[1], p.y or p[2] end
+  end
+  local r2 = guide.ON_GRAPH_M * guide.ON_GRAPH_M
+  return function(x, y)
+    for i = 1, n do
+      local dx, dy = xs[i] - x, ys[i] - y
+      if dx * dx + dy * dy <= r2 then return true end
+    end
+    return false
+  end
+end
+
+-- A leg's line in the current frame (guide.line of its world points); built again when the anchor changes.
+local function guideLine(leg)
+  return guide.line(legs.toWorld(legPoints(leg), st.anchor, st.bias))
+end
+
+local function guideApply(g)
+  local gm = rawget(_G, 'core_groundMarkers')
+  if gm and g.rest then guide.addRest(gm.routePlanner, g.rest) end
+end
+
+-- Set the arrows' path for the car where it is: g.cur is the target in force.
+local function guideSet(g, gm, p, tgt, off)
+  local x, y, z = tgt.x, tgt.y, tgt.z
+  if tgt.final then x, y, z = guide.pointAt(g.line, g.line.total - guide.FINAL_BEFORE_M) end
+  local list = { vec3(x, y, z or p[3]) }
+  local options = {}
+  for k, v in pairs(guide.PLANNER) do options[k] = v end
+  gm.setPath(list, options)
+  g.set, g.cur, g.dirty, g.foreign = gm.endWP, tgt, false, false
+  g.rest = guide.rest(g.line, tgt)
+  guideApply(g)
+  local onLine = off <= guide.ON_LINE_M
+  if g.onLine ~= onLine or not g.logged then
+    g.onLine, g.logged = onLine, true
+    ownLog('I', string.format('liaison %s guidance: %s; target %.0f m along its line (%.0f m of it), %.0f m rest', g.leg,
+      onLine and 'on the line' or string.format('%.0f m off the line', off), tgt.s, g.line.total, g.rest))
+  end
+end
+
+local function guideTick()
+  local g = st.guide
+  if not g then return end
+  if st.phase ~= 'running' then st.guide = nil; return end
+  if st.clock - (g.at or -10) < GUIDE_EVERY_S then return end
+  g.at = st.clock
+  local gm = rawget(_G, 'core_groundMarkers')
+  if not (gm and gm.setPath) then st.guide = nil; return end
+  if gm.endWP ~= g.set then
+    -- Not ours any more. Another path (Earth's GPS, until claimGroundMarkers clears it, or the game's next route, which
+    -- raises the hook and starts over) leaves ours to be put back when it goes; none at all while ours was in force is the game
+    -- ending the guidance (the control was reached).
+    if gm.endWP ~= nil then g.foreign = true; return end
+    if not g.foreign then st.guide = nil; return end
+    g.dirty = true
+  end
+  local p = playerPos()
+  if not p then return end
+  if g.anchor ~= st.anchor then
+    g.anchor, g.line, g.s0, g.cur, g.dirty = st.anchor, guideLine(g.legObj), nil, nil, true
+    if not g.line then st.guide = nil; return end
+  end
+  local s0, off = guide.progress(g.line, p[1], p[2], g.s0)
+  if not s0 then return end
+  g.s0 = s0
+  local tgt = guide.target(g.line, s0, guideOnGraph())
+  if g.dirty or guide.moved(g.cur, tgt) then
+    guideSet(g, gm, p, tgt, off)
+  else
+    guideApply(g)
+  end
+end
+
+-- The planner made a new path of its own (the car was off the path): its distance calculation forgets what is beyond the target.
+function M.onRecalculatedRoute()
+  if st.guide and st.guide.set then guideApply(st.guide) end
+end
+
+function M.onCreatedRallyGroundMarkerRoute()
+  local ok, err = pcall(function()
+    if st.phase ~= 'running' or not (st.anchor and st.edition and st.geometry) then return end
+    local gm = rawget(_G, 'core_groundMarkers')
+    local wps = gm and gm.endWP
+    local last = wps and wps[#wps]
+    if not last then return end
+    local lx, ly = last.x or last[1], last.y or last[2]
+    local best, bestD
+    for _, leg in ipairs(st.edition.legs) do
+      if leg.type == 'transfer' and st.geometry[leg.id] then
+        local line = guideLine(leg)
+        if line then
+          local e = line.pts[#line.pts]
+          local d = math.sqrt((e[1] - lx) ^ 2 + (e[2] - ly) ^ 2)
+          if d <= GUIDE_MATCH_M and (not bestD or d < bestD) then best, bestD = { leg = leg, line = line }, d end
+        end
+      end
+    end
+    if not best then st.guide = nil; return end        -- (not a liaison of ours: the game's own route stays)
+    st.guide = { leg = best.leg.id, legObj = best.leg, line = best.line, anchor = st.anchor, dirty = true, at = -10, set = wps }
+    guideTick()
+  end)
+  if not ok then
+    st.guide = nil
+    ownLog('E', "liaison guidance failed, the game's own route stays: " .. tostring(err))
+  end
+end
 
 -- The indexes of the roads, read again where the navgraph or our road changed (the version counts it).
 local function roadsReady()
@@ -1140,6 +1269,7 @@ function M.onAnyMissionChanged(state, mission)
   elseif state == 'stopped' then
     st.ourStart = false
     scenery.active = false
+    st.guide = nil
     sceneryClear()
     pcall(shapeRefresh)
     -- The loop is over, however it ended (finished, abandoned, quit to the menu): we are idle again. Left at 'running', the
@@ -1348,13 +1478,19 @@ local im
 local adaptPtr, shapePtr
 
 -- Where the car is: sampled every hud.PERIOD_S, logged, and drawn top right every frame (an imgui window is
--- drawn each frame or it is gone). The lines are the curated stages and liaisons, as the shaping numbers them.
+-- drawn each frame or it is gone). The lines are the curated stages (numbered as the shaping numbers them), then the liaisons.
 local function hudLines()
   if not (st.anchor and st.edition and st.geometry) then return nil end
   local out = {}
   for _, leg in ipairs(st.edition.legs) do
     local r = curatedLines()[leg.id]
     if r then out[#out + 1] = { id = leg.id, pts = legs.toWorld(r.points, st.anchor, st.bias) } end
+  end
+  -- (the liaisons after them: the stages keep their numbers)
+  for _, leg in ipairs(st.edition.legs) do
+    if leg.type ~= 'special' and st.geometry[leg.id] then
+      out[#out + 1] = { id = leg.id, pts = legs.toWorld(legPoints(leg), st.anchor, st.bias) }
+    end
   end
   return out
 end
@@ -1790,6 +1926,11 @@ function M.onUpdate(dt)
     local okT, errT = pcall(missionsTick)
     if not okT and not st.missionsWarned then st.missionsWarned = true; ownLog('E', 'mission markers failed: ' .. tostring(errT)) end
     if scenery.active or st.phase == 'running' then pcall(claimGroundMarkers, 'while the loop runs') end
+  end
+  local okU, errU = pcall(guideTick)
+  if not okU then
+    st.guide = nil
+    if not st.guideWarned then st.guideWarned = true; ownLog('E', 'liaison guidance failed: ' .. tostring(errU)) end
   end
   local okH, errH = pcall(shapeTick)
   if not okH and not st.shapeWarned then st.shapeWarned = true; ownLog('E', 'ground shaping failed: ' .. tostring(errH)) end

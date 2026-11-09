@@ -487,9 +487,9 @@ def test_the_route_and_the_car_are_put_on_the_games_ground(lua):
         g = json.load(open(os.path.join(EDITION, "geometry", leg["id"] + ".json")))
         put(base + "geometry/%s.json" % leg["id"], conv(lua2, g))
     lua2.execute("PLAYER_LL = { %r, %r }" % tuple(json.load(open(os.path.join(EDITION, "geometry", "road1.json")))["points"][0][:2]))
-    # flat ground 3.3 m under the terrain data at the first place asked (TC0), wherever it is asked after (the car's spawn in
-    # the lot, a few metres from TC0, stands on that ground: half a metre above it)
-    lua2.execute("core_terrain = { getTerrainHeight = function(p) GROUND = GROUND or (p.z - 3.3); return GROUND end }")
+    # flat ground 3.3 m under the terrain data at TC0, wherever it is asked (the car's spawn in the lot, a few metres from TC0,
+    # stands on that ground: half a metre above it; the markers are put on it too, and may ask first)
+    lua2.execute("GROUND = %r; core_terrain = { getTerrainHeight = function(p) return GROUND end }" % (flat[0] - 0.5 - 3.3))
     lua2.execute("core.start('testbed-algarve')")
     lua2.execute("earthAnchorCommit(37.0900, -7.9800)")
     lua2.execute("core.onUpdate(5)")

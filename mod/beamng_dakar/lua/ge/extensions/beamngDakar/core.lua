@@ -1519,6 +1519,21 @@ function M.start(editionId, noLaunch)
   clearStartGps()
 end
 
+-- A mission's start moved. The game copies startTrigger.pos into its locations cache the first time it reads a mission
+-- (missions.lua getLocations), and the marker, the big map and the start check all read that copy: moving startTrigger
+-- alone left them where info.json put them, 0, 0, 0 (GitHub #1). The copy moves too. The mission is tagged with the frame
+-- it was placed in: a mission object without the tag is one the game has built again from info.json (missionsTick).
+local function moveStart(mission, x, y, z)
+  mission.startTrigger.pos = { x, y, z }
+  mission.dakarFrame = st.anchor
+  local get = gameplay_missions_missions.getLocations
+  local ok, locs = false, nil
+  if get then ok, locs = pcall(get, mission) end
+  for _, l in ipairs(ok and type(locs) == 'table' and locs or {}) do
+    if l.type == 'coordinates' then l.pos = vec3(x, y, z) end
+  end
+end
+
 -- The loops' start triggers (where the game puts a mission's marker) stand on their service parks in the current frame,
 -- so they move with every anchor change; not while a loop runs (launch put its trigger on the real ground).
 placeTrigger = function()
@@ -1529,8 +1544,7 @@ placeTrigger = function()
     local mission = c and gameplay_missions_missions.getMissionById(loopMissionId(c.edition))
     if mission and mission.startTrigger then
       local lat, lon, h = servicePark(c.edition, c.geometry)
-      local x, y, z = st.anchor:geodeticToWorld(lat, lon, h)
-      mission.startTrigger.pos = { x, y, z }
+      moveStart(mission, st.anchor:geodeticToWorld(lat, lon, h))
     end
     -- every leg's own mission (a liaison or a special stage) has its marker on the time control that opens it, the leg's
     -- first point (TC0 for the first liaison, TC1 for SS1, ...); their info.json says 0, 0, 0, the world's origin (GitHub #76)
@@ -1539,11 +1553,39 @@ placeTrigger = function()
       local p = g and g.points and g.points[1]
       local lm = p and gameplay_missions_missions.getMissionById('beamng_earth/' .. missionType(leg) .. '/' .. missionName(c.edition, leg))
       if lm and lm.startTrigger then
-        local x, y, z = st.anchor:geodeticToWorld(p[1], p[2], p[3])
-        lm.startTrigger.pos = { x, y, z }
+        moveStart(lm, st.anchor:geodeticToWorld(p[1], p[2], p[3]))
       end
     end
   end
+  -- the markers and the big map are drawn from the game's POI list: gathered again (as Earth does for its gas stations)
+  if gameplay_rawPois and gameplay_rawPois.clear then gameplay_rawPois.clear() end
+end
+
+-- Every few seconds: the game's mission list is read once, and cleared only when the mod manager is ready, so an add-on
+-- installed while the game runs (BeamNG.Earth 1.9.0's Add-ons page) had no activities until Ctrl+L (GitHub #1). Our loop
+-- missing from it clears it, once (not while a mission runs: that holds its own mission object). And whenever the game
+-- has built its mission objects again (a reload of the list), they came from info.json: the markers are placed again.
+local function missionsTick()
+  local mm = gameplay_missions_missions
+  if not (mm and mm.getMissionById) then return end
+  local loopId
+  for _, id in ipairs(editionIds()) do
+    local c = loadCached(id)
+    if c then loopId = loopMissionId(c.edition); break end
+  end
+  if not loopId then return end
+  local mission = mm.getMissionById(loopId)
+  local mgr = gameplay_missions_missionManager
+  local busy = mgr and mgr.getForegroundMissionId and mgr.getForegroundMissionId()
+  if not mission and not st.missionListRead and mm.clearCache and not busy then
+    st.missionListRead = true
+    mm.clearCache()
+    if gameplay_rawPois and gameplay_rawPois.clear then gameplay_rawPois.clear() end
+    mission = mm.getMissionById(loopId)
+    ownLog('I', 'the game\'s mission list had no Dakar missions (installed while the game ran): read again, '
+      .. (mission and 'found' or 'still missing'))
+  end
+  if mission and st.anchor and mission.dakarFrame ~= st.anchor then placeTrigger() end
 end
 
 function M.status()
@@ -1573,6 +1615,8 @@ function M.onUpdate(dt)
       local es = earthState()
       if es and es.anchor then st.anchor = es.anchor; placeTrigger() end
     end
+    local okT, errT = pcall(missionsTick)
+    if not okT and not st.missionsWarned then st.missionsWarned = true; ownLog('E', 'mission markers failed: ' .. tostring(errT)) end
   end
   local okH, errH = pcall(shapeTick)
   if not okH and not st.shapeWarned then st.shapeWarned = true; ownLog('E', 'ground shaping failed: ' .. tostring(errH)) end

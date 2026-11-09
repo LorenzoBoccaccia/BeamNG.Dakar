@@ -109,15 +109,34 @@ STARTED, STARTED_ARGS, FOREGROUND, STOPPED = false, nil, nil, false
 -- the loops of the installed editions, by id (the prefix of each edition's missions)
 -- (a leg's own mission, rallyStage / rallyRoadSection, is a table of its own: LEG_MISSIONS[id], GitHub #76)
 LEG_MISSIONS = {}
+-- as the game's missions.lua: the list of missions is read once (LISTED: false, an add-on mounted after it was read, until
+-- clearCache), and getLocations copies a mission's start the first time it is asked (GitHub #1)
+LISTED, MOUNTED, LIST_CLEARS, POI_CLEARS, LOCATIONS = true, true, 0, 0, {}
 gameplay_missions_missions = { getMissionById = function(id)
+  if not LISTED then return nil end
   if id:find('/rallyStage/') or id:find('/rallyRoadSection/') then
-    LEG_MISSIONS[id] = LEG_MISSIONS[id] or { id = id, startTrigger = { pos = { 0, 0, 0 } } }
+    LEG_MISSIONS[id] = LEG_MISSIONS[id] or { id = id, startTrigger = { type = 'coordinates', pos = { 0, 0, 0 } } }
     return LEG_MISSIONS[id]
   end
   local m = id:find('dakar%%-popoli') and MISSION_POPOLI or id:find('dakar%%-testbed') and MISSION or nil
   if m then m.id = id end
   return m
+end,
+getLocations = function(m)
+  if not LOCATIONS[m.id] then
+    local p = m.startTrigger.pos or { 0, 0, 0 }
+    LOCATIONS[m.id] = { { type = 'coordinates', pos = vec3(p[1], p[2], p[3]) } }
+  end
+  return LOCATIONS[m.id]
+end,
+-- the missions built again from their info.json: the legs' at 0, 0, 0, the loops' without what was set on them
+clearCache = function()
+  LIST_CLEARS = LIST_CLEARS + 1
+  LISTED = MOUNTED
+  LEG_MISSIONS, LOCATIONS = {}, {}
+  for _, m in ipairs({ MISSION, MISSION_POPOLI }) do m.startTrigger, m.dakarFrame = {}, nil end
 end }
+gameplay_rawPois = { clear = function() POI_CLEARS = POI_CLEARS + 1 end }
 -- the game's file system: the folders of the editions folder (and, as the real one may, the files)
 FS = { directoryList = function(self, path) return { '/dakar/editions/svolte-di-popoli', '/dakar/editions/testbed-algarve' } end }
 STARTS = 0
@@ -775,6 +794,58 @@ def test_every_legs_mission_has_its_marker_on_the_time_control_that_opens_it(lua
     lua.execute("earthAnchorCommit(42.1750, 13.8240)")
     moved = [tc("rallyStage/dakar-popoli-ss1", i) for i in (1, 2)]
     assert math.dist(moved, ss1) > 100
+
+
+def test_the_marker_the_game_draws_moves_with_the_start(lua):
+    # GitHub #1: the game had already copied the start (getLocations) when Dakar moved it; the marker, the big map and the
+    # start check read that copy, and stayed at info.json's 0, 0, 0
+    lua.execute("gameplay_missions_missions.getLocations(gameplay_missions_missions.getMissionById("
+                "'beamng_earth/rallyStage/dakar-popoli-ss1'))")
+    lua.execute("core.onExtensionLoaded()")
+    lua.execute("core.onUpdate(3)")
+    clears = lua.eval("POI_CLEARS")
+    lua.execute("earthAnchorCommit(42.1700, 13.8300)")
+    loc = lua.eval("LOCATIONS['beamng_earth/rallyStage/dakar-popoli-ss1'][1].pos")
+    start = lua.eval("LEG_MISSIONS['beamng_earth/rallyStage/dakar-popoli-ss1'].startTrigger.pos")
+    assert (loc.x, loc.y) == (start[1], start[2]) and (loc.x, loc.y) != (0, 0)
+    assert lua.eval("POI_CLEARS") > clears                          # the POI list gathered again
+
+
+def test_an_add_on_installed_while_the_game_runs_has_its_activities_without_a_reload(lua):
+    # GitHub #1: the game read its mission list before the add-on was mounted; Ctrl+L was needed to see them
+    lua.execute("LISTED = false")
+    lua.execute("core.onExtensionLoaded()")
+    lua.execute("earthAnchorCommit(42.1700, 13.8300)")
+    lua.execute("core.onUpdate(3)")
+    assert lua.eval("LIST_CLEARS") == 1 and lua.eval("LISTED")
+    ss1 = lua.eval("LEG_MISSIONS['beamng_earth/rallyStage/dakar-popoli-ss1'].startTrigger.pos")
+    assert abs(ss1[1]) < 2000 and (ss1[1], ss1[2]) != (0, 0)
+    # once only: an edition whose missions are not there does not clear the game's list every few seconds
+    lua.execute("MOUNTED = false; gameplay_missions_missions.clearCache(); LIST_CLEARS = 0")
+    for _ in range(3):
+        lua.execute("core.onUpdate(3)")
+    assert lua.eval("LIST_CLEARS") == 0
+
+
+def test_the_markers_are_placed_again_when_the_game_reads_its_missions_again(lua):
+    # GitHub #1: a reload of the list (the mod manager ready, another mod) builds the missions again from info.json
+    lua.execute("core.onExtensionLoaded()")
+    lua.execute("core.onUpdate(3)")
+    lua.execute("earthAnchorCommit(42.1700, 13.8300)")
+    lua.execute("gameplay_missions_missions.clearCache()")
+    assert lua.eval("MISSION_POPOLI.startTrigger.pos") is None
+    lua.execute("core.onUpdate(3)")
+    p = [lua.eval("MISSION_POPOLI.startTrigger.pos[%d]" % i) for i in (1, 2)]
+    assert abs(p[0]) < 2000 and abs(p[1]) < 2000
+    ss1 = lua.eval("LEG_MISSIONS['beamng_earth/rallyStage/dakar-popoli-ss1'].startTrigger.pos")
+    assert (ss1[1], ss1[2]) != (0, 0)
+
+
+def test_the_mission_list_is_not_cleared_under_a_running_mission(lua):
+    lua.execute("LISTED = false; FOREGROUND = 'beamng_earth/somethingElse/x'")
+    lua.execute("core.onExtensionLoaded()")
+    lua.execute("core.onUpdate(3)")
+    assert lua.eval("LIST_CLEARS") == 0
 
 
 def test_the_props_are_those_of_the_edition_that_runs(lua):

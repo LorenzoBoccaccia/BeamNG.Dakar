@@ -27,6 +27,17 @@ M.START_CLEAR_M = 5        -- nothing before this (the start line) ...
 M.END_CLEAR_M = 10         -- ... and nothing this close to the end: the route builder drops what lies past the stop
 M.WAYPOINT_RADIUS = 8      -- the stock notebooks' waypoint radius
 
+-- Hairpins and square corners are called by name, not by number, so the name has to be earned by the shape: what the stock
+-- notebooks call a hairpin, a tight hairpin or an open hairpin (measured on all the stock structured notebooks: the circle
+-- through the corner's two ends and its middle) is a U-turn on a circle of 7 to 17 m radius, 13 to 34 m between its ends.
+-- A bend that turns as far on a circle of 60 m is a wide sweeping corner, called by its number and "long", not a hairpin.
+M.HAIRPIN_MIN_ANGLE_DEG = 130
+M.TIGHT_HAIRPIN_RADIUS_M = 9      -- below this radius: a tight hairpin
+M.HAIRPIN_RADIUS_M = 18           -- below this: a hairpin ...
+M.OPEN_HAIRPIN_RADIUS_M = 25      -- ... and below this an open hairpin; a wider bend has no name, only its number
+M.SQUARE_MIN_ANGLE_DEG = 70
+M.SQUARE_RADIUS_M = 16
+
 -- The stock english 1-6 numbering (compositors/styles/english/numbering/one_to_six.lua): the diameter of the circle the
 -- corner is fitted with, in metres, up to which each number is called.
 M.DIAMETER_BOUNDS = { 35, 65, 116, 190, 260 }
@@ -124,6 +135,15 @@ local function curvature(r)
   return k
 end
 
+-- The radius of the circle through three points (x, y), or nil when they are in line
+local function circumradius(p, q, w)
+  local a, b, c = sqrt((q[1] - w[1]) ^ 2 + (q[2] - w[2]) ^ 2), sqrt((p[1] - w[1]) ^ 2 + (p[2] - w[2]) ^ 2),
+    sqrt((p[1] - q[1]) ^ 2 + (p[2] - q[2]) ^ 2)
+  local twiceArea = abs((q[1] - p[1]) * (w[2] - p[2]) - (w[1] - p[1]) * (q[2] - p[2]))
+  if twiceArea < 1e-9 then return nil end
+  return a * b * c / (2 * twiceArea)
+end
+
 -- The runs of points on which the road turns one way tighter than ENTER_RADIUS_M (with the hysteresis), merged when
 -- two the same way are close together. { sign, i0, i1 } each (sign 1 = left).
 local function runs(r, kappa)
@@ -173,14 +193,15 @@ local function crossing(r, from, to, frac)
   return r.s[to]
 end
 
--- Hairpins and square corners are called by name, not by number; the bounds are what a stock notebook author calls so.
+-- Hairpins and square corners are called by name, not by number: the turn has to be a U-turn (or a right angle) and on a
+-- small circle, as in a stock notebook. The angle alone is not enough: a long bend of 150 degrees on a 60 m circle is not one.
 local function descriptor(angle, radius)
-  if angle >= 130 then
-    if radius < 9 then return 'tightHairpin' end
-    if radius < 22 then return 'hairpin' end
+  if angle >= M.HAIRPIN_MIN_ANGLE_DEG and radius < M.OPEN_HAIRPIN_RADIUS_M then
+    if radius < M.TIGHT_HAIRPIN_RADIUS_M then return 'tightHairpin' end
+    if radius < M.HAIRPIN_RADIUS_M then return 'hairpin' end
     return 'openHairpin'
   end
-  if angle >= 70 and radius <= 16 then return 'square' end
+  if angle >= M.SQUARE_MIN_ANGLE_DEG and angle < M.HAIRPIN_MIN_ANGLE_DEG and radius <= M.SQUARE_RADIUS_M then return 'square' end
   return nil
 end
 
@@ -218,12 +239,17 @@ function M.scan(pts)
       local s0, s1 = crossing(r, lo, hi, M.TRIM), crossing(r, hi, lo, M.TRIM)
       if s1 <= s0 then s0, s1 = r.s[lo], r.s[hi] end
       local sweep = abs(turn) * (1 - 2 * M.TRIM)
-      -- The radius is the circle through the corner's two ends that turns the road by the sweep (the game fits a circle
-      -- too). Not the length over the sweep: the source points are 10-20 m apart and the heading changes at each, so
-      -- the length between the first and last change overstates the arc and the radius with it.
+      -- The radius is what the game will measure: the circle through the corner's two ends and its middle (the game fits
+      -- one circle through the road points at its two waypoints and halfway between). Not the length over the sweep: the
+      -- source points are 10-20 m apart and the heading changes at each, so the length between the first and last change
+      -- overstates the arc and the radius with it. Where the three points are all but in line the circle is huge and
+      -- the circle through the ends that turns the road by the sweep stands in.
       local a, b = pointAt(r, s0), pointAt(r, s1)
-      local chord = sqrt((b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2)
-      local radius = sweep < pi * 0.8 and chord / (2 * math.sin(sweep / 2)) or (s1 - s0) / sweep
+      local radius = circumradius(a, pointAt(r, (s0 + s1) / 2), b)
+      if not radius or radius > 2000 then
+        local chord = sqrt((b[1] - a[1]) ^ 2 + (b[2] - a[2]) ^ 2)
+        radius = sweep < pi * 0.8 and chord / (2 * math.sin(sweep / 2)) or (s1 - s0) / sweep
+      end
       local c = {
         s0 = s0, s1 = s1, sign = run.sign, direction = run.sign > 0 and 'left' or 'right',
         angle = angle, radius = radius, severity = M.severity(2 * radius),
@@ -282,6 +308,20 @@ local function pacenote(r, c, i)
     slowCorner = false, slowCornerReleaseType = 30, todo = false, triggerType = 1,
     structured = { items = { ['4'] = corner }, schemaVersion = 3 },
   }
+end
+
+-- One line for the log: how many corners the notebook calls and where, against the route's length, and the names among them
+function M.summary(corners, routeLength)
+  if #corners == 0 then return 'no corners' end
+  local names, bySeverity = 0, {}
+  for _, c in ipairs(corners) do
+    if c.descriptor then names = names + 1 end
+    bySeverity[c.severity] = (bySeverity[c.severity] or 0) + 1
+  end
+  local counts = {}
+  for sev = 1, 6 do counts[#counts + 1] = string.format('%d:%d', sev, bySeverity[sev] or 0) end
+  return string.format('%d corners called, the first at %.0f m and the last at %.0f m of %.0f m; %d by name (hairpin, square); by number %s',
+    #corners, corners[1].s0, corners[#corners].s0, routeLength or 0, names, table.concat(counts, ' '))
 end
 
 -- The notebook for a route (world points): named 'structured', the one every stock voicepack lists last, so any

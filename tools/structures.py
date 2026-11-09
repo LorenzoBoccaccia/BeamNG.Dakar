@@ -19,6 +19,13 @@ climbs) is recorded as `"tunnelsBeside"`: [{ "from": m, "to": m, "way": <OSM way
 TUNNEL_NEAR_M of a tunnel way's axis. Earth builds the tunnel's tube and portals and shapes the terrain for them (holes at the mouths, the
 ground raised over a low arch), so the ground shaping leaves the ground along those stretches as Earth made it.
 
+Every other road near the line is recorded as `"otherRoads"`: [{ "way": <OSM way id>, "hw": half width m, "pts": [[lat, lon], ...] }], the pieces of the
+drivable ways that are within OTHER_NEAR_M of the line and not the stage's own road (a piece within OWN_M of the line is the road itself, the
+carriageway the line runs on, or a crossing road's own crossing, which is the stage road's ground too), without the bridges and tunnels (the
+ground under a deck belongs to what is below it; a tunnel's is Earth's, `tunnelsBeside`). The ground shaping never moves the ground of those
+(a carriageway, its shoulders and a margin) beyond the stage road's own footprint: a motorway beside the road, a crossing road, a road that
+leaves it.
+
 Network: overpass-api.de, and api.openstreetmap.org when Overpass does not answer (read only). The matching (spans()) is pure.
 """
 import json
@@ -43,6 +50,15 @@ CHUNK_M = 1500.0           # the Overpass queries cover the line in pieces this 
 TUNNEL_NEAR_M = 30.0        # a tunnel way's axis this near the line: Earth's portal holes and arch raise reach about 12 m from the axis, and the shaping
                             # reaches 11.5 m from the line (shape.CORE_M + shape.BLEND_M), a point of the line 10 m apart
 AROUND_M = TUNNEL_NEAR_M + 5.0
+OTHER_NEAR_M = 30.0         # a piece of another road this near the line is recorded: the shaping reaches 11.5 m from the line (shape.CORE_M + BLEND_M)
+                            # and keeps clear of another road's ground by its half width, a margin and a fade (about 12 m for a motorway)
+OWN_M = 5.0                 # a point of a way this near the line is the stage's own road (the OpenStreetMap way and Earth's route differ by a metre or
+                            # two), or a crossing road's crossing: the ground under it is the stage road's, not another road's
+OTHER_STEP_M = 2.0          # the ways are looked at every this many metres
+OTHER_HALF_M = {"motorway": 6.5, "trunk": 6.0, "primary": 4.5, "secondary": 4.0, "tertiary": 3.5, "unclassified": 3.0, "residential": 3.0,
+                "living_street": 2.5, "service": 2.0, "track": 1.5, "road": 3.0, "motorway_link": 4.0, "trunk_link": 4.0,
+                "primary_link": 3.5, "secondary_link": 3.5, "tertiary_link": 3.0}   # the carriageway's half width with its shoulders, by class
+LANE_M = 3.5
 DRIVABLE = {"motorway", "trunk", "primary", "secondary", "tertiary", "unclassified", "residential", "service", "track",
             "living_street", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link", "road"}
 NOT_A_TUNNEL = {"no", "culvert", "flooded", "avalanche_protector"}      # (a culvert carries water under the road, not the road)
@@ -219,6 +235,85 @@ def tunnels_beside(points, ways, near_m=TUNNEL_NEAR_M, sample_m=SAMPLE_M):
     return [{"from": round(t["from"], 1), "to": round(min(t["to"], s_off), 1), "way": t["way"]} for t in merged]
 
 
+def half_width(tags):
+    """The half width (m) of a way's ground, carriageway and shoulders: a width tag, else the class's, widened by the lanes tag."""
+    try:
+        w = float(str(tags.get("width", "")).split()[0])
+        if 1.0 <= w <= 40.0:
+            return round(w / 2.0, 2)
+    except (ValueError, IndexError):
+        pass
+    hw = OTHER_HALF_M.get(tags.get("highway"), 3.0)
+    try:
+        lanes = int(str(tags.get("lanes", "")).split(";")[0])
+        if 1 <= lanes <= 8:
+            hw = max(hw, lanes * LANE_M / 2.0 + 0.5)
+    except (ValueError, IndexError):
+        pass
+    return round(hw, 2)
+
+
+def other_roads(points, ways, near_m=OTHER_NEAR_M, own_m=OWN_M, step_m=OTHER_STEP_M):
+    """The pieces of the drivable ways within near_m of a line that are not the stage's own road (see the module's text): a list of
+    {"way": id, "hw": half width, "pts": [[lat, lon], ...]} (pieces of at least two points, 6 decimals), in the order of the ways.
+    points: [(lat, lon, ...)]; ways as in spans(). Bridges and tunnels are left out."""
+    if len(points) < 2:
+        return []
+    lat0, lon0 = points[0][0], points[0][1]
+    mlat, mlon = _scales(lat0)
+
+    def xy(p):
+        return ((p[1] - lon0) * mlon, (p[0] - lat0) * mlat)
+
+    line = [xy(p) for p in points]
+    cell = max(near_m, 20.0)
+    grid = {}                                       # the line's segments by cell, for the nearest distance
+    for k, ((ax, ay), (bx, by)) in enumerate(zip(line, line[1:])):
+        for gx in range(int(math.floor((min(ax, bx) - near_m) / cell)), int(math.floor((max(ax, bx) + near_m) / cell)) + 1):
+            for gy in range(int(math.floor((min(ay, by) - near_m) / cell)), int(math.floor((max(ay, by) + near_m) / cell)) + 1):
+                grid.setdefault((gx, gy), []).append(k)
+
+    def dist_to_line(x, y):
+        best = None
+        for k in grid.get((int(math.floor(x / cell)), int(math.floor(y / cell))), ()):
+            (ax, ay), (bx, by) = line[k], line[k + 1]
+            d = _seg_dist(x, y, ax, ay, bx, by)
+            if best is None or d < best:
+                best = d
+        return best
+
+    out = []
+    for w in ways:
+        tags = w.get("tags") or {}
+        if tags.get("highway") not in DRIVABLE or kind_of(tags):
+            continue
+        g = w["geometry"]
+        gxy = [xy(p) for p in g]
+        samples = [(gxy[0][0], gxy[0][1], g[0][0], g[0][1])]        # the way at an even step: (x, y, lat, lon)
+        for i in range(len(g) - 1):
+            (ax, ay), (bx, by) = gxy[i], gxy[i + 1]
+            n = max(1, int(math.ceil(math.hypot(bx - ax, by - ay) / step_m)))
+            for q in range(1, n + 1):
+                f = q / n
+                samples.append((ax + (bx - ax) * f, ay + (by - ay) * f, g[i][0] + (g[i + 1][0] - g[i][0]) * f,
+                                g[i][1] + (g[i + 1][1] - g[i][1]) * f))
+        pieces, run = [], []
+        for x, y, la, lo in samples:
+            d = dist_to_line(x, y)
+            if d is not None and own_m < d <= near_m:
+                run.append([round(la, 6), round(lo, 6)])
+            else:
+                if len(run) >= 2:
+                    pieces.append(run)
+                run = []
+        if len(run) >= 2:
+            pieces.append(run)
+        hw = half_width(tags)
+        for piece in pieces:
+            out.append({"way": w["id"], "hw": hw, "pts": piece})
+    return out
+
+
 def fetch_ways(points):
     """The drivable ways near a line, with their tags and geometry, from Overpass (in pieces along the line)."""
     pts = [(p[0], p[1]) for p in points]
@@ -288,17 +383,17 @@ def record(points):
 
 
 def record_all(points):
-    """(structures, tunnelsBeside) of a leg's points: one fetch of the ways."""
+    """(structures, tunnelsBeside, otherRoads) of a leg's points: one fetch of the ways."""
     ways = fetch_ways(points)
-    return spans(points, ways), tunnels_beside(points, ways)
+    return spans(points, ways), tunnels_beside(points, ways), other_roads(points, ways)
 
 
 def update_file(path):
     """Writes the structures into a geometry file, leaving the rest as it is. Returns the list."""
     with open(path, encoding="utf-8") as f:
         geo = json.load(f)
-    found, beside = record_all(geo["points"])
-    for key, val in (("structures", found), ("tunnelsBeside", beside)):
+    found, beside, others = record_all(geo["points"])
+    for key, val in (("structures", found), ("tunnelsBeside", beside), ("otherRoads", others)):
         if val:
             geo[key] = val
         else:
@@ -322,6 +417,8 @@ def main():
         beside = json.load(open(path, encoding="utf-8")).get("tunnelsBeside", [])
         print("%s: %d stretch(es) beside a tunnel%s" % (lid, len(beside), "".join(
             "\n  %.0f..%.0f m (OSM way %s)" % (s["from"], s["to"], s["way"]) for s in beside)))
+        others = json.load(open(path, encoding="utf-8")).get("otherRoads", [])
+        print("%s: %d piece(s) of other roads near the line (%d way(s))" % (lid, len(others), len({o["way"] for o in others})))
 
 
 if __name__ == "__main__":

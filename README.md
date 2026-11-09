@@ -186,6 +186,15 @@ written to its files:
     to 997 m), and at run time the tubes Earth has built in the game now (the points along their axes that Earth's
     `ambience.tunnelLights()` gives, when it has that call). The data is what is certain: Earth's tubes are known only for
     the road tiles loaded;
+  - nothing on another road's ground: the geometry's `"otherRoads": [{"way": id, "hw": m, "pts": [[lat, lon], ...]}]` (`tools/structures.py`
+    writes them with the structures, from OpenStreetMap's other drivable ways within 30 m of the line: a motorway beside the stage road, a road that
+    crosses it, a road that leaves it; not the stage's own road, which is what is within 5 m of the line, and not bridges and tunnels: the ground
+    under a deck is what is below it, a tunnel's is Earth's) are kept clear of beyond the stage road's own 5.5 m: a cell on a road's carriageway,
+    shoulders and 2 m of margin is not moved, and the taper of the stage's fix eases to nothing over 3 m before it. The ground under the stage
+    road itself follows the stage road, a crossing included. Earth's own road grading (below) is not ours to change, and neither is what it
+    leaves beside a tunnel: Earth grades every road it draws, a motorway's profile over 40 m, with its own cut and fill slopes, and leaves the ground over a
+    covered tunnel (its half width and 5 m) as the elevation data has it. The Popoli stage's 650 to 735 m crosses over the A25's tunnel (the line is
+    within a metre of its axis there; the plain A25 ways are 35 m off and its viaduct 55 m), which is the ground in that stretch;
   - the ground at either end of a deck, met to the deck's top: a bridge OpenStreetMap tags (`structures` in the
     geometry), and a deck of our own road the game's colliders show, tagged or not (the culvert after the Popoli
     underpass). The latter is a run of points under a wide collider (as wide as a road) that stands over the ground, one point

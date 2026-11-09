@@ -487,9 +487,9 @@ def test_the_route_and_the_car_are_put_on_the_games_ground(lua):
         g = json.load(open(os.path.join(EDITION, "geometry", leg["id"] + ".json")))
         put(base + "geometry/%s.json" % leg["id"], conv(lua2, g))
     lua2.execute("PLAYER_LL = { %r, %r }" % tuple(json.load(open(os.path.join(EDITION, "geometry", "road1.json")))["points"][0][:2]))
-    # flat ground 3.3 m under the terrain data at the first place asked (TC0), wherever it is asked after (the car's spawn in
-    # the lot, a few metres from TC0, stands on that ground: half a metre above it)
-    lua2.execute("core_terrain = { getTerrainHeight = function(p) GROUND = GROUND or (p.z - 3.3); return GROUND end }")
+    # flat ground 3.3 m under the terrain data at TC0, wherever it is asked (the car's spawn in the lot, a few metres from TC0,
+    # stands on that ground: half a metre above it; the markers are put on it too, and may ask first)
+    lua2.execute("GROUND = %r; core_terrain = { getTerrainHeight = function(p) return GROUND end }" % (flat[0] - 0.5 - 3.3))
     lua2.execute("core.start('testbed-algarve')")
     lua2.execute("earthAnchorCommit(37.0900, -7.9800)")
     lua2.execute("core.onUpdate(5)")
@@ -794,6 +794,47 @@ def test_every_legs_mission_has_its_marker_on_the_time_control_that_opens_it(lua
     lua.execute("earthAnchorCommit(42.1750, 13.8240)")
     moved = [tc("rallyStage/dakar-popoli-ss1", i) for i in (1, 2)]
     assert math.dist(moved, ss1) > 100
+
+
+GROUND_NEAR = (
+    "LOADED = %s; HINTS = {}; core_terrain = { getTerrainHeight = function(p) "
+    "HINTS[string.format('%%.1f,%%.1f', p.x, p.y)] = p.z; "
+    "if LOADED and math.abs(p.x) < 5000 and math.abs(p.y) < 5000 then return p.z + 0.42 end end }")
+
+
+def logged(lua, text):
+    return any(text in line for line in lua.eval("LOG").values())
+
+
+def test_a_marker_stands_on_the_games_ground_not_at_the_routes_height(lua):
+    # the route data said 264.08 m at the Svolte di Popoli's TC0, the game's ground is 264.5: the marker was under it
+    lua.execute(GROUND_NEAR % "true")
+    lua.execute("core.onExtensionLoaded()")
+    lua.execute("core.onUpdate(3)")
+    lua.execute("earthAnchorCommit(42.1700, 13.8300)")
+    for mid in ("rallyRoadSection/dakar-popoli-road1", "rallyStage/dakar-popoli-ss1"):
+        x, y, z = (lua.eval("LEG_MISSIONS['beamng_earth/%s'].startTrigger.pos[%d]" % (mid, i)) for i in (1, 2, 3))
+        data_z = lua.eval("HINTS['%.1f,%.1f']" % (x, y))
+        assert z == pytest.approx(data_z + 0.42)
+        # the drawn marker (the game's copy) is on the ground too
+        assert lua.eval("LOCATIONS['beamng_earth/%s'][1].pos.z" % mid) == pytest.approx(z)
+
+
+def test_a_marker_whose_ground_is_not_loaded_yet_goes_down_once_it_is(lua):
+    lua.execute(GROUND_NEAR % "false")
+    lua.execute("core.onExtensionLoaded()")
+    lua.execute("core.onUpdate(3)")
+    lua.execute("earthAnchorCommit(42.1700, 13.8300)")
+    pos = lambda: lua.eval("LEG_MISSIONS['beamng_earth/rallyStage/dakar-popoli-ss1'].startTrigger.pos[3]")
+    data_z = pos()
+    clears = lua.eval("POI_CLEARS")
+    lua.execute("LOADED = true; core.onUpdate(3)")
+    assert pos() == pytest.approx(data_z + 0.42)
+    assert logged(lua, "put on the ground") and lua.eval("POI_CLEARS") == clears + 1
+    # the far edition's markers (2000 km away) stay waiting without gathering the POI list again every few seconds
+    for _ in range(3):
+        lua.execute("core.onUpdate(3)")
+    assert lua.eval("POI_CLEARS") == clears + 1
 
 
 def test_the_marker_the_game_draws_moves_with_the_start(lua):

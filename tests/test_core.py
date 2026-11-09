@@ -573,6 +573,32 @@ def test_a_main_menu_start_loads_the_level_then_teleports_to_the_service_park_an
     assert not logs(lua, "started outside") and lua.eval("STOPPED") is False
 
 
+def test_a_menu_start_after_a_loop_was_quit_is_not_held_up(lua):
+    # the testbed's loop ran and was quit to the main menu; the Svolte di Popoli started from the menu then waited for us to
+    # be idle until it gave up ("the Earth level was not in after 180 s"), though the level and Earth's anchor were in
+    launched(lua)
+    lua.execute("core.onAnyMissionChanged('started', MISSION)")
+    lua.execute("core.onAnyMissionChanged('stopped', MISSION)")         # quit to the menu
+    assert logs(lua, "the loop stopped: idle again")
+    lua.execute("LEVEL = nil; EARTH_IN_LEVEL = false; ANCHOR_LL = nil; TELEPORT = nil")
+    lua.execute("core.onClientEndMission()")
+    lua.execute("gameplay_missions_missionManager.startWithLoadingLevel(MISSION_POPOLI, nil, nil, 'gameplaySelector')")
+    lua.execute("LEVEL = 'beamng_earth'; EARTH_IN_LEVEL = true; ANCHOR_LL = { 37.09, -7.99 }; PLAYER_LL = { 37.0884, -7.9865 }")
+    lua.execute("core.onUpdate(1)")
+    assert logs(lua, "the Earth level is in")
+    assert lua.eval("TELEPORT[1]") == pytest.approx(42.1749, abs=1e-3)  # on its way to the Popoli service park
+
+
+def test_a_finished_loop_lets_the_markers_follow_the_anchor_again(lua):
+    launched(lua)
+    lua.execute("core.onAnyMissionChanged('started', MISSION)")
+    lua.execute("core.onAnyMissionChanged('stopped', MISSION)")
+    before = lua.eval("LEG_MISSIONS['beamng_earth/rallyStage/dakar-popoli-ss1'].startTrigger.pos[1]")
+    lua.execute("earthAnchorCommit(42.1700, 13.8300)")
+    after = lua.eval("LEG_MISSIONS['beamng_earth/rallyStage/dakar-popoli-ss1'].startTrigger.pos[1]")
+    assert abs(after) < 2000 and after != before
+
+
 def test_a_held_loading_screen_never_outlives_the_level_or_a_failed_start(lua):
     lua.execute("core.onExtensionLoaded()")
     lua.execute("LEVEL = nil; EARTH_IN_LEVEL = false")

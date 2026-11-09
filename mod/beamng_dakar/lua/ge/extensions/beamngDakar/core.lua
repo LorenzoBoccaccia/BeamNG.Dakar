@@ -1075,6 +1075,8 @@ local function shapeStatusText()
     sh.state, sh.stretches, sh.stretches == 1 and '' or 'es', sh.cells, sh.maxChange, ago)
 end
 
+local placeTrigger       -- (below) puts the loop's start trigger on the service park in the current frame
+
 -- The loop is on: its props stand; it stopped (finished, abandoned, a level change): they go.
 function M.onAnyMissionChanged(state, mission)
   local ours = type(mission) == 'table' and mission.missionTypeData and mission.missionTypeData.dakarEdition
@@ -1095,6 +1097,13 @@ function M.onAnyMissionChanged(state, mission)
     scenery.active = false
     sceneryClear()
     pcall(shapeRefresh)
+    -- The loop is over, however it ended (finished, abandoned, quit to the menu): we are idle again. Left at 'running', the
+    -- next start from the mission list waited for idle until it gave up, and the markers stopped following the anchor.
+    if st.phase == 'running' then
+      st.phase = 'idle'
+      ownLog('I', 'the loop stopped: idle again')
+      if placeTrigger then pcall(placeTrigger) end
+    end
   end
 end
 
@@ -1107,8 +1116,6 @@ function M.onRebaseBegin(xf)
   ownLog('I', string.format('DAKAR-PROBE rebase #%d begins, rally positions held: %d', st.rebases + 1, (function()
     local n = 0 for _ in pairs(st.rebase.before) do n = n + 1 end return n end)()))
 end
-
-local placeTrigger       -- (below) puts the loop's start trigger on the service park in the current frame
 
 -- Earth's own anchor commit (a teleport's or a rebase's): the world is in the new frame now.
 function M.onAnchor(lat, lon)

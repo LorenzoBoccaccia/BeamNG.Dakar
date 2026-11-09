@@ -50,12 +50,38 @@ local function unit(dx, dy, dz)
   return { dx / l, dy / l, dz / l }
 end
 
--- The orientation BeamNG stores for something facing along (dx, dy): a turn about +z that takes +y to the direction.
+-- BeamNG's quaternions turn the other way round: the game's `q * v` (lua/common/mathlib.lua, LuaQuat.__mul) is
+-- v - w t + q x t with t = 2 q x v, the rotation by the conjugate of the textbook formula. A turn about +z of `a` radians
+-- (x = y = 0, z = sin(a/2), w = cos(a/2)) therefore takes +y to (sin a, cos a): the compass bearing a, clockwise seen from
+-- above. This is the game's own formula, so a reading of an orientation made with it does not depend on how this file
+-- built it.
+local function rotate(q, v)
+  local qx, qy, qz, qw = q[1], q[2], q[3], q[4]
+  local tx, ty, tz = 2 * (qy * v[3] - qz * v[2]), 2 * (qz * v[1] - qx * v[3]), 2 * (qx * v[2] - qy * v[1])
+  return {
+    v[1] - qw * tx + (qy * tz - qz * ty),
+    v[2] - qw * ty + (qz * tx - qx * tz),
+    v[3] - qw * tz + (qx * ty - qy * tx),
+  }
+end
+M.rotate = rotate
+
+-- The orientation (quatFromDir's) whose +y points along (dx, dy): the way the game stores a time control's or a start
+-- position's direction of travel (the plane tests of the rally nodes read +y as the way on: rallySuperCountdown,
+-- vehicleStoppedNearPlane), and a mission's start trigger's.
 local function yawQuat(dx, dy)
-  local th = atan2(-dx, dy)
+  local th = atan2(dx, dy)
   return { 0, 0, sin(th / 2), cos(th / 2) }
 end
 M.yawQuat = yawQuat
+
+-- The orientation a vehicle object has when it faces along (dx, dy): a vehicle's front is its local -y, so +y points the
+-- other way. What rallyMoveVehicleTo (the node that puts the car on the service stall) hands to setPositionRotation as it
+-- is; spawn.safeTeleport turns quatFromDir's by half a turn first for the same reason.
+local function carQuat(dx, dy)
+  return yawQuat(-dx, -dy)
+end
+M.carQuat = carQuat
 
 -- geometry points -> world points {x, y, z} (and the lat/lon kept beside them: the truth they came from).
 -- zBias (metres) is added to every height: the terrain data's heights differ from the game's ground by a few metres, and
@@ -315,6 +341,13 @@ end
 -- where the first leg begins (TC0), on the line of its first segment, facing it: the stock loops park the car 65-73 m from
 -- TC0 (Italy ngrc25 65.3 m, Utah ngrc26 72.8 m); on TC0 itself the loop timed the player at once. The height
 -- is TC0's or the lead's: the caller puts it on the game's ground there.
+--
+-- Two orientations, for the two places the game reads them: `rot` is the car's own (the stall: rallyMoveVehicleTo sets it on
+-- the vehicle object as it is, and a vehicle's front is its -y), `dirRot` the way the car faces as quatFromDir has it (+y
+-- -- along it: the mission's start trigger, which spawn.safeTeleport and the missions' POI list turn into a car's). The stock
+-- loops' stalls turn their cars' backs to TC0 (Italy's 131 degrees off the way to it, Utah's 108), which is what the
+-- dashboard's "Reverse out and reach TC0" says (app.rallyDashboard.vue, hard-coded for TC0 whatever the stall); ours faces
+-- TC0, and the game's text stays as it is.
 M.STALL_BACK_M = 70
 M.SPAWN_FACING_M = 6        -- the car faces the way the lead goes over its first metres, not toward its first vertex
 function M.loopPlacement(firstWpts, backM, lead)
@@ -324,12 +357,12 @@ function M.loopPlacement(firstWpts, backM, lead)
       if dist(lead[i], p) >= M.SPAWN_FACING_M then q = lead[i]; break end
     end
     local t = unit(q[1] - p[1], q[2] - p[2], 0)
-    return { pos = { p[1], p[2], p[3] }, rot = yawQuat(t[1], t[2]), backM = length(lead), inLot = true }
+    return { pos = { p[1], p[2], p[3] }, rot = carQuat(t[1], t[2]), dirRot = yawQuat(t[1], t[2]), backM = length(lead), inLot = true }
   end
   local p = firstWpts[1]
   local t = unit(firstWpts[2][1] - p[1], firstWpts[2][2] - p[2], 0)
   local b = backM or M.STALL_BACK_M
-  return { pos = { p[1] - t[1] * b, p[2] - t[2] * b, p[3] }, rot = yawQuat(t[1], t[2]), backM = b }
+  return { pos = { p[1] - t[1] * b, p[2] - t[2] * b, p[3] }, rot = carQuat(t[1], t[2]), dirRot = yawQuat(t[1], t[2]), backM = b }
 end
 
 -- ---------------------------------------------------------------------------------------------------------------------
@@ -386,10 +419,17 @@ function M.joins(wl)
   return out
 end
 
--- The heading (degrees counter-clockwise from +x, as props.yawFor has it) a stored orientation faces: the model's front is
--- local +y, which a turn of th about +z takes to the angle th + 90 degrees.
+-- The heading (degrees counter-clockwise from +x, as props.yawFor has it) of the way a stored orientation points its local
+-- +y (a time control's or a start position's way on), and of the way a vehicle with it faces (its front is local -y): both
+-- read with the game's own rotation (M.rotate), not by undoing what the builders do, so a convention that is wrong in both
+-- is seen as wrong.
 local function facingDeg(q)
-  return math.deg(2 * atan2(q[3], q[4])) + 90
+  local v = rotate(q, { 0, 1, 0 })
+  return math.deg(atan2(v[2], v[1]))
+end
+local function carFacingDeg(q)
+  local v = rotate(q, { 0, -1, 0 })
+  return math.deg(atan2(v[2], v[1]))
 end
 local function offDeg(a, b)
   return math.abs((a - b + 180) % 360 - 180)
@@ -416,6 +456,7 @@ function M.probeLines(res)
   return out
 end
 M.facingDeg = facingDeg
+M.carFacingDeg = carFacingDeg
 
 -- Everything for an edition at an anchor: { files = { [path under the mission folders] = table },
 -- placement = loopPlacement, lengths = { [leg id] = metres }, corners = { [special leg id] = the corners its notebook calls },
@@ -464,7 +505,7 @@ function M.materialize(edition, geometry, anchor, missionDirOf, zBias, curated)
   local lot = geometry[edition.legs[1].id].servicePark
   local lead = lot and lot.lead and M.toWorld(lot.lead, anchor, zBias) or nil
   local placement = M.loopPlacement(wl[1], edition.serviceStallBackM, lead)
-  placement.facing = facingDeg(placement.rot)
+  placement.facing = carFacingDeg(placement.rot)      -- (the car's real front, as the game turns the stall's orientation)
   placement.road = headingDeg(lead and dirAlong(lead, false) or dirAlong(wl[1], false))
   return { files = files, placement = placement, lengths = lengths, corners = notes, joins = joins, markers = markers }
 end

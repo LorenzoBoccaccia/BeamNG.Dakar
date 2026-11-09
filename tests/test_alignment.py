@@ -13,6 +13,7 @@ lupa = pytest.importorskip("lupa")
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
+import beamng_quat as bq  # noqa: E402
 import joins  # noqa: E402
 import legplan  # noqa: E402
 import parkinglot as pl  # noqa: E402
@@ -75,8 +76,9 @@ class World:
     def start(self, leg, k):
         """The start position k (1 = TC_in / SS_start_line, 2 = TC_out / SS_stop_control): name, (x, y, z), facing in degrees."""
         sp = self.res["files"]["m/%s/race.race.json" % leg]["startPositions"][k]
-        q = sp["rot"]
-        return sp["name"], (sp["pos"][1], sp["pos"][2], sp["pos"][3]), math.degrees(2 * math.atan2(q[3], q[4])) + 90, (q[1], q[2], q[3], q[4])
+        q = quat(sp["rot"])
+        # (the way the control points its +y, which the rally nodes read as the way on, turned by the game's own `q * v`)
+        return sp["name"], (sp["pos"][1], sp["pos"][2], sp["pos"][3]), bq.heading(q), q
 
     def road(self, leg, at_end, window=10.0):
         """The direction (degrees counter-clockwise from +x) the leg goes in over its first / last `window` metres."""
@@ -91,6 +93,11 @@ class World:
 
 def off(a, b):
     return abs((a - b + 180) % 360 - 180)
+
+
+def quat(q):
+    """A Lua quaternion table as the (x, y, z, w) tuple."""
+    return (q[1], q[2], q[3], q[4])
 
 
 @pytest.fixture(scope="module", params=EDITIONS)
@@ -167,6 +174,24 @@ def test_the_car_starts_on_an_aisle_inside_the_lot_facing_its_exit(ed):
     assert joins.angle_diff(lot["exit"]["bearing"], joins.bearing(exit_at, beyond)) < 90
 
 
+def test_the_testbed_lot_is_a_straight_drive_from_the_car_past_tc0_to_the_exit_with_the_booth_beside_the_car():
+    # the plan the player drives, once the car faces the way it goes: spawn -> TC0 -> exit on one line (the aisle), the lot's
+    # exit 60 m on, the route turning there; the booth's own gazebo beside the car, its front toward it
+    edition, geo = load("testbed-algarve")
+    g = geo[edition["legs"][0]["id"]]
+    lot = g["servicePark"]
+    spawn = (lot["spawn"]["lat"], lot["spawn"]["lon"])
+    tc0, exit_at = tuple(g["points"][0][:2]), (lot["exit"]["lat"], lot["exit"]["lon"])
+    assert 15 <= joins.metres(spawn, tc0) <= 25 and 40 <= joins.metres(spawn, exit_at) <= 80
+    ways = [joins.bearing(spawn, tc0), joins.bearing(tc0, exit_at), joins.bearing(spawn, exit_at), lot["spawn"]["bearing"]]
+    assert max(joins.angle_diff(a, b) for a in ways for b in ways) < 2                      # one line: no kink at TC0
+    gazebo = next(p for p in lot["booth"] if p["kind"] == "gazebo" and p.get("variant") == "blastr")
+    at = (gazebo["lat"], gazebo["lon"])
+    assert 3 <= joins.metres(spawn, at) <= 6
+    assert joins.angle_diff(joins.bearing(spawn, at), (lot["spawn"]["bearing"] + 90) % 360) < 15      # on the car's right
+    assert joins.angle_diff(gazebo["bearing"], (joins.bearing(spawn, at) + 180) % 360) < 15            # its front toward the car
+
+
 @pytest.mark.parametrize("ed", EDITIONS)
 def test_tc0_is_a_few_metres_ahead_inside_the_lot_and_the_car_is_not_timed_at_once(ed):
     edition, geo = load(ed)
@@ -190,12 +215,21 @@ def test_the_stall_is_the_spawn_facing_along_the_lot_with_tc0_ahead(real):
     w = real.legs.toWorld(conv(real.rt, lot["lead"]), real.anchor)
     assert pl_["inLot"] is True
     assert math.dist((pl_["pos"][1], pl_["pos"][2]), (w[1][1], w[1][2])) < 1e-6          # the car is on the aisle, at the spawn
-    q = pl_["rot"]
-    facing = math.degrees(2 * math.atan2(q[3], q[4])) + 90
+    # the car's own orientation: its front (local -y, as the game turns it) faces along the lead, TC0 ahead of it
+    facing = bq.car_heading(quat(pl_["rot"]))
     lead_dir = math.degrees(math.atan2(w[len(w)][2] - w[1][2], w[len(w)][1] - w[1][1]))
     assert off(facing, math.degrees(math.atan2(w[2][2] - w[1][2], w[2][1] - w[1][1]))) < 35
     assert off(facing, pl_["road"]) < 35
-    assert off(facing, lead_dir) < 90                                                     # TC0 is ahead, not behind
+    assert off(facing, pl_["facing"]) < 1e-6                                              # (what the probe reports is this reading)
+    assert off(facing, lead_dir) < 35                                                      # TC0 is ahead, not behind
+    fx, fy = math.cos(math.radians(facing)), math.sin(math.radians(facing))
+    to_tc0 = (w[len(w)][1] - pl_["pos"][1], w[len(w)][2] - pl_["pos"][2])
+    assert (to_tc0[0] * fx + to_tc0[1] * fy) / math.hypot(*to_tc0) > 0.9
+    # the mission's start trigger has the way the car faces as quatFromDir has it, and the game turns that into the car's
+    # (spawn.safeTeleport: quat(0,0,1,0) * rot): the stall's orientation is exactly what the game makes of it
+    trigger = quat(pl_["dirRot"])
+    assert off(bq.heading(trigger), facing) < 1e-6
+    assert bq.mul(bq.HALF_TURN, trigger) == pytest.approx(quat(pl_["rot"]), abs=1e-9) or         bq.mul(bq.HALF_TURN, trigger) == pytest.approx(tuple(-c for c in quat(pl_["rot"])), abs=1e-9)
     # TC0 itself: the first control, at the end of the lead
     name, pos, _, _ = real.start(real.ids[0], 1)
     assert name == "TC_in" and math.dist(pos[:2], (w[len(w)][1], w[len(w)][2])) < 1e-6
@@ -212,8 +246,7 @@ def test_without_a_lot_the_stall_stands_back_from_tc0_as_before(rt, ed):
     assert not pl_["inLot"] and pl_["backM"] == 70
     name, tc0, facing, _ = w.start(w.ids[0], 1)
     assert math.dist(tc0[:2], (pl_["pos"][1], pl_["pos"][2])) == pytest.approx(70, abs=1e-6)
-    q = pl_["rot"]
-    assert off(math.degrees(2 * math.atan2(q[3], q[4])) + 90, facing) < 5
+    assert off(bq.car_heading(quat(pl_["rot"])), facing) < 5                              # the car faces TC0 and the road from it
 
 
 def check_markers_and_joins(w):

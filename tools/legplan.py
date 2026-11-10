@@ -10,6 +10,7 @@ Given each leg's via points and a router (vias -> a path of (lat, lon)), this ma
 
 Pure: the router and the parking lot lookup are passed in (fetch_route.py passes OSRM and Overture).
 """
+import inspect
 import math
 
 import booth
@@ -38,13 +39,22 @@ class Leg:
     def route(self, route_fn, vias=None):
         vias = vias or self.vias
         if not self.plan:
-            return dedupe(route_fn(vias))
+            return dedupe(call_route(route_fn, vias, self.cfg))
         # the lot's own aisles to its exit, then the route from there (the first via point stands for the lot)
         path = [tuple(p) for p in self.plan["path"]]
-        tail = route_fn([list(self.plan["exit"])] + list(vias[1:]))
+        tail = call_route(route_fn, [list(self.plan["exit"])] + list(vias[1:]), self.cfg)
         if joins.metres(path[-1], tail[0]) < 1.0:
             tail = tail[1:]
         return dedupe(path + [tuple(p) for p in tail])
+
+
+def call_route(route_fn, vias, cfg):
+    """route_fn(vias) or, for a router that knows the legs' kinds (tools/fetch_route.py: roads, pistes), route_fn(vias, leg)."""
+    try:
+        two = len(inspect.signature(route_fn).parameters) >= 2
+    except (TypeError, ValueError):
+        two = False
+    return route_fn(vias, cfg) if two else route_fn(vias)
 
 
 def start_in_lot(leg, route_fn, find_lot, log):
@@ -65,7 +75,7 @@ def start_in_lot(leg, route_fn, find_lot, log):
     # the lot takes the first via point's place: routed through both, the leg went to that point and back past the lot,
     # ~1.8 km round the service park before it left
     vias = [[info["lat"], info["lon"]]] + via[1:]
-    out = route_fn(vias)
+    out = call_route(route_fn, vias, leg)
     exit_at = parkinglot.exit_of(group, out)
     # (where the lot's map data is known the car starts where the service booth has room beside it)
     room = booth.room(group, info["_area"], info.get("_buildings")) if "_area" in info else None
@@ -123,26 +133,39 @@ def split_lead(pts, plan):
     return lead, rest
 
 
-def plan_edition(legs, route_fn, find_lot=None, log=print):
+DRIVEN = ("special", "transfer")      # (a ferry leg and a rest day have no road: tools/fetch_route.py writes nothing for them)
+JOIN_REACH_M = 300.0                  # two legs whose end and start are further apart than this are not joined (the ferry between two days)
+
+
+def plan_edition(legs, route_fn, find_lot=None, log=print, join=True):
     """Every leg of an edition planned: a list of { leg, pts, lead, plan, lot, joinIn } in order (lead: the way from the car to
     TC0 for a first leg in a lot, else None; lot: the lot's record or None; joinIn: how the join with the leg before was
-    made, or None). `legs`: the edition's legs.json legs."""
+    made, or None). `legs`: the edition's legs.json legs. join=False: the routes alone (a plan of lengths: no join is tried, which asks
+    the router for every candidate)."""
     items = []
+    legs = [l for l in legs if l.get("type", "transfer") in DRIVEN]
     for i, cfg in enumerate(legs):
         via, plan, lot = [list(v) for v in cfg["via"]], None, None
-        if i == 0 and cfg.get("parkingNear") and find_lot:
+        # (the first leg of an edition, or of a day, may start in a parking lot: the service park)
+        if cfg.get("parkingNear") and find_lot:
             via, plan, lot = start_in_lot(cfg, route_fn, find_lot, log)
         leg = Leg(cfg, via, plan, lot)
         leg.pts = leg.route(route_fn)
         items.append(leg)
-    for i in range(len(items) - 1):
+    for i in range(len(items) - 1 if join else 0):
         a, b = items[i], items[i + 1]
+        if b.plan or joins.metres(a.pts[-1], b.pts[0]) > JOIN_REACH_M:
+            # the first leg of a day that starts in a lot, or the other side of a ferry: nothing to join the day before to
+            b.joinIn = {"mode": "kept", "shiftM": 0.0}
+            continue
 
         def reroute_a(end, a=a):
             return a.route(route_fn, a.vias[:-1] + [[end[0], end[1]]])
 
         def reroute_b(start, b=b):
-            return dedupe(route_fn([[start[0], start[1]]] + b.vias[1:]))
+            if b.cfg.get("router") in ("piste", "straight"):
+                raise RuntimeError("a piste is not routed again from another start")     # (it would take minutes; the join moves a instead)
+            return dedupe(call_route(route_fn, [[start[0], start[1]]] + b.vias[1:], b.cfg))
         old_a, old_b = a.pts, b.pts
         pa, pb, info = joins.align(a.pts, b.pts, reroute_a, reroute_b)
         a.pts, b.pts = pa, pb

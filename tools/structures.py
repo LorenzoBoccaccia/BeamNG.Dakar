@@ -46,6 +46,7 @@ ANGLE_DEG = 20.0            # ... when it runs within this of the line's directi
 TIE_M = 1.5                 # a bridge or tunnel way must be this much nearer than a plain one to be the road the line is on
 MERGE_GAP_M = 12.0          # two spans of one kind closer than this along the line are one
 MIN_SPAN_M = 6.0            # a shorter stretch is a mismatch, not a bridge
+LONG_LEG_M = 60000.0       # a leg longer than this gets its ways from the Overture tiles, not from Overpass (record_all)
 CHUNK_M = 1500.0           # the Overpass queries cover the line in pieces this long
 TUNNEL_NEAR_M = 30.0        # a tunnel way's axis this near the line: Earth's portal holes and arch raise reach about 12 m from the axis, and the shaping
                             # reaches 11.5 m from the line (shape.CORE_M + shape.BLEND_M), a point of the line 10 m apart
@@ -382,8 +383,28 @@ def record(points):
     return spans(points, fetch_ways(points))
 
 
-def record_all(points):
-    """(structures, tunnelsBeside, otherRoads) of a leg's points: one fetch of the ways."""
+def ways_from_overture(points, margin_m=45.0):
+    """The ways near a long line, from the Overture road tiles tools/roadnet.py keeps (their bridge and tunnel flags and classes), in the
+    form fetch_ways gives: [{id, tags, geometry}]. A 490 km stage is 330 Overpass pieces of 1.5 km; this asks the network nothing the
+    stage's own route did not (the tiles along it are read already)."""
+    import roadnet
+    ways = []
+    for seg in roadnet.roads_along(points, margin_m):
+        tags = {"highway": seg["cls"]}
+        if "is_bridge" in seg.get("flags", ()):
+            tags["bridge"] = "yes"
+        if "is_tunnel" in seg.get("flags", ()):
+            tags["tunnel"] = "yes"
+        ways.append({"id": seg["id"], "tags": tags, "geometry": [(p[0], p[1]) for p in seg["line"]]})
+    return ways
+
+
+def record_all(points, long_leg=False):
+    """(structures, tunnelsBeside, otherRoads) of a leg's points: one fetch of the ways. A long leg's ways come from the Overture tiles
+    (ways_from_overture) and its otherRoads are left out: the shaping of the ground beside a stage has them for the short specials only."""
+    if long_leg:
+        ways = ways_from_overture(points)
+        return spans(points, ways), tunnels_beside(points, ways), []
     ways = fetch_ways(points)
     return spans(points, ways), tunnels_beside(points, ways), other_roads(points, ways)
 
@@ -392,7 +413,7 @@ def update_file(path):
     """Writes the structures into a geometry file, leaving the rest as it is. Returns the list."""
     with open(path, encoding="utf-8") as f:
         geo = json.load(f)
-    found, beside, others = record_all(geo["points"])
+    found, beside, others = record_all(geo["points"], long_leg=geo.get("lengthM", 0) > LONG_LEG_M)
     for key, val in (("structures", found), ("tunnelsBeside", beside), ("otherRoads", others)):
         if val:
             geo[key] = val

@@ -86,7 +86,7 @@ def install_links(dst):
 
 def mod_files():
     """[(path inside the mod, file here)] of everything the game reads: the mod folder as it is, and each edition's
-    legs.json, geometry/ and closures/ (where a special stage's side roads are closed off) under dakar/editions/.
+    legs.json, index.json (an edition of days), geometry/ and closures/ (where a special stage's side roads are closed off) under dakar/editions/.
     The copy install and the add-on zip are both this list, so they cannot differ."""
     out = []
     for base, _dirs, names in os.walk(MOD_SRC):
@@ -98,6 +98,8 @@ def mod_files():
         if not os.path.isfile(os.path.join(src, "legs.json")):
             continue
         out.append(("dakar/editions/%s/legs.json" % ed, os.path.join(src, "legs.json")))
+        if os.path.isfile(os.path.join(src, "index.json")):      # (an edition of days: where each leg starts, read before its geometry is)
+            out.append(("dakar/editions/%s/index.json" % ed, os.path.join(src, "index.json")))
         for sub in ("geometry", "closures"):
             for base, _dirs, names in os.walk(os.path.join(src, sub)):
                 for n in names:

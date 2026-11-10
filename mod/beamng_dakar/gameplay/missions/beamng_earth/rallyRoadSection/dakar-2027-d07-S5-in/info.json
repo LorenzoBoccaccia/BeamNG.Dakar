@@ -1,0 +1,75 @@
+{
+  "additionalAttributes": {},
+  "author": "BeamNG",
+  "careerSetup": {
+    "defaultStarKeys": {},
+    "showInFreeroam": true,
+    "skill": "(none)",
+    "starOutroTexts": {},
+    "starRewards": {},
+    "starsActive": {}
+  },
+  "customAdditionalAttributes": {},
+  "date": 1794184296,
+  "description": "Stage 5: Zagora loop, Erg Chegaga: a road section of 95 km.",
+  "devMission": true,
+  "grouping": {
+    "id": "",
+    "label": ""
+  },
+  "layers": [
+    {
+      "dir": "/gameplay/missions/beamng_earth/rallyRoadSection/dakar-2027-d07-S5-in/",
+      "fixed": true,
+      "isMissionFolderDir": true,
+      "isMissionTypeDir": false
+    },
+    {
+      "dir": "/gameplay/missionTypes/rallyRoadSection/",
+      "fixed": true,
+      "isMissionFolderDir": false,
+      "isMissionTypeDir": true
+    }
+  ],
+  "missionType": "rallyRoadSection",
+  "missionTypeData": {},
+  "name": "Dakar 2027: Portugal - Morocco: Stage 5: Zagora to stage 5",
+  "retryBehaviour": "infiniteRetries",
+  "setupModules": {
+    "environment": {
+      "enabled": false
+    },
+    "traffic": {
+      "enabled": false
+    },
+    "vehicles": {
+      "enabled": true,
+      "includePlayerVehicle": true,
+      "playerVehicleDiffs": {},
+      "prioritizePlayerVehicle": true,
+      "vehicles": {}
+    }
+  },
+  "startCondition": {
+    "type": "never"
+  },
+  "startTrigger": {
+    "level": "beamng_earth",
+    "pos": [
+      0,
+      0,
+      0
+    ],
+    "radius": 3,
+    "rot": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "type": "coordinates"
+  },
+  "visibleCondition": {
+    "type": "never"
+  }
+}

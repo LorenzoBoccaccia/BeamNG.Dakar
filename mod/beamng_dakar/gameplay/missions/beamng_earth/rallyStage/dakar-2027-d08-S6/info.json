@@ -1,0 +1,98 @@
+{
+  "additionalAttributes": {},
+  "author": "BeamNG",
+  "careerSetup": {
+    "defaultStarKeys": [
+      "bronzeTime",
+      "silverTime",
+      "goldTime"
+    ],
+    "showInFreeroam": true,
+    "skill": "(none)",
+    "starOutroTexts": {},
+    "starRewards": {},
+    "starsActive": {
+      "bronzeTime": true,
+      "goldTime": true,
+      "silverTime": true
+    }
+  },
+  "customAdditionalAttributes": {},
+  "date": 1794184296,
+  "description": "Stage 6: Zagora to Agadir: a timed stage of 380 km (published special length 365 km).",
+  "devMission": true,
+  "grouping": {
+    "id": "",
+    "label": ""
+  },
+  "layers": [
+    {
+      "dir": "/gameplay/missions/beamng_earth/rallyStage/dakar-2027-d08-S6/",
+      "fixed": true,
+      "isMissionFolderDir": true,
+      "isMissionTypeDir": false
+    },
+    {
+      "dir": "/gameplay/missionTypes/rallyStage/",
+      "fixed": true,
+      "isMissionFolderDir": false,
+      "isMissionTypeDir": true
+    }
+  ],
+  "missionType": "rallyStage",
+  "missionTypeData": {
+    "baselineTime": 21088.0,
+    "bronzeTime": 31632.0,
+    "bronzeTimePenalty": 20,
+    "bronzeTimeTotal": 31632.0,
+    "endScreenText": "",
+    "goldTime": 21088.0,
+    "goldTimePenalty": 0,
+    "goldTimeTotal": 21088.0,
+    "justFinishPenalty": 30,
+    "outroTitleText": "missions.missions.rally.endScreen.stageTitle",
+    "silverTime": 25306.0,
+    "silverTimePenalty": 10,
+    "silverTimeTotal": 25306.0,
+    "startScreenText": ""
+  },
+  "name": "Dakar 2027: Portugal - Morocco: Stage 6: Stage 6, Anti-Atlas",
+  "retryBehaviour": "infiniteRetries",
+  "setupModules": {
+    "environment": {
+      "enabled": false
+    },
+    "traffic": {
+      "enabled": false
+    },
+    "vehicles": {
+      "enabled": true,
+      "includePlayerVehicle": true,
+      "playerVehicleDiffs": {},
+      "prioritizePlayerVehicle": true,
+      "vehicles": {}
+    }
+  },
+  "startCondition": {
+    "type": "never"
+  },
+  "startTrigger": {
+    "level": "beamng_earth",
+    "pos": [
+      0,
+      0,
+      0
+    ],
+    "radius": 3,
+    "rot": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "type": "coordinates"
+  },
+  "visibleCondition": {
+    "type": "never"
+  }
+}

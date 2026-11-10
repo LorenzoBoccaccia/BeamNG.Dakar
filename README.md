@@ -44,6 +44,97 @@ messages on screen and the add-on's options; on 1.8.2 `earthapi.lua` gets the sa
 has no equivalent of stays a tap (the list is in core.lua's header): a rebase, the anchor commit, a new terrain block and
 the corridor download's progress.
 
+## The 2027 route: a loop a day
+
+`editions/2027-portugal-morocco` is the whole 2027 Dakar (Portugal and Morocco, Jan 9 to 23): 15 days, 17 stops, each driven day a
+**rally loop of its own** in the mission list (`Dakar 2027: Prologue`, `Stage 1`, `Transfer`, `Stage 2` ... `Stage 12`). A day's loop is its
+liaison to the start, its special and the liaison on to the next bivouac, as the game's rally loop runs them; each day starts where the
+one before ended, the service park of a day being that bivouac. Starting a day from the mission list when you are not at its bivouac
+**teleports you there** (Earth's teleport, as the start of the testbed's loop does) and starts it; the BeamNG.Dakar window has the days with
+`<` and `>`. Days:
+
+- a day that ends where it began (the prologue, stages 2, 3, 5, 10, 12 are loops from a bivouac) ends at its service stall as the game's loop does;
+- a day that ends elsewhere (stage 4 to Zagora, stage 6 to Agadir, stage 7 to Smara ...) has a second service stall at its end, which
+  the loop's own variable is switched to when the return liaison begins (`core.lua`, `setStall`): driving into it ends the loop;
+- the finished day (the car at its end when the loop stops, not abandoned) tells you what comes next: the next day, and the rest day on the way if
+  there is one;
+- the **ferry** (`F1`, type `ferry` in `legs.json`) ends the stage 1 day: no driving; when you finish that day the car is taken from the departure
+  port to the landing at Nador (Beni Ensar) by the same Earth teleport (`M.crossFerry`), with a message, and the next day (the transfer to Bouarfa)
+  is offered from there. The window has a button to take the ferry at once;
+- the **rest day** in Agadir has no mission: the window lists it and the day before it says so;
+- the transfer day Nador - Bouarfa (413 km by road) is a loop with no stage, only its return liaison.
+
+What is real and what is authored: ASO publishes the towns, the km and the dates (see `status`, `sources` and `unconfirmed` in `legs.json`),
+not the roads. Each stage's `via` points are authored here: the prologue, stage 1 and the liaisons follow roads (OSRM), the Moroccan stages follow the
+tracks Overture Maps has (`tools/roadnet.py`) and cross the dunes and the hamada in straight lines where it has none
+(`offNetworkM` in a stage's geometry file says how much). Lengths are tuned to the published special km; the liaisons are the roads between the bivouacs
+and the stage ends, so a day's total km is not the official one. The Spanish port is not named by ASO: Almeria is assumed.
+
+```
+python tools/fetch_route.py editions/2027-portugal-morocco --plan [leg ids]   (lengths against the published ones, nothing written)
+python tools/fetch_route.py editions/2027-portugal-morocco [leg ids]          (geometry/<leg>.json and index.json; tools/.cache keeps what was downloaded)
+python tools/stage_closures.py editions/2027-portugal-morocco [leg ids]       (side roads; a stage over 60 km is worked in pieces from the cached tiles)
+python tools/make_missions.py editions/2027-portugal-morocco                  (the loop and leg mission files of each day)
+python tools/make_preview.py editions/2027-portugal-morocco                   (a picture per day's loop)
+```
+
+Built against published, per leg (km; "off the map" is the share of a stage that is a straight line across the dunes and the hamada because Overture
+Maps has no track there; the liaisons are not published except the 590 km of the Algarve - port transfer):
+
+| Date | Leg | Kind | Published km | Built km | Off the map |
+|---|---|---|---|---|---|
+| 01-09 | P-in | liaison | - | 19 | - |
+| 01-09 | P | special | 29 | 29 (+1.4%) | - |
+| 01-09 | P-out | liaison | - | 26 | - |
+| 01-10 | S1-in | liaison | - | 47 | - |
+| 01-10 | S1 | special | 100 | 100 (-0.5%) | - |
+| 01-10 | T1 | liaison | 590 | 582 (-1.4%) | - |
+| 01-10 | F1 | ferry | - | teleport | - |
+| 01-11 | T2 | liaison | - | 414 | - |
+| 01-12 | S2-in | liaison | - | 64 | - |
+| 01-12 | S2 | special | 390 | 387 (-0.9%) | 75% |
+| 01-12 | S2-out | liaison | - | 39 | - |
+| 01-13 | S3-in | liaison | - | 13 | - |
+| 01-13 | S3 | special | 410 | 411 (+0.2%) | 100% |
+| 01-13 | S3-out | liaison | - | 61 | - |
+| 01-14 | S4-in | liaison | - | 179 | - |
+| 01-14 | S4 | special | 490 | 493 (+0.7%) | 57% |
+| 01-14 | S4-out | liaison | - | 52 | - |
+| 01-15 | S5-in | liaison | - | 95 | - |
+| 01-15 | S5 | special | 365 | 379 (+3.8%) | 38% |
+| 01-15 | S5-out | liaison | - | 99 | - |
+| 01-16 | S6-in | liaison | - | 124 | - |
+| 01-16 | S6 | special | 365 | 380 (+4.0%) | 44% |
+| 01-16 | S6-out | liaison | - | 89 | - |
+| 01-17 | R | rest | - | - | - |
+| 01-18 | S7-in | liaison | - | 189 | - |
+| 01-18 | S7 | special | 500 | 509 (+1.8%) | 48% |
+| 01-18 | S7-out | liaison | - | 52 | - |
+| 01-19 | S8-in | liaison | - | 72 | - |
+| 01-19 | S8 | special | 355 | 355 (+0.0%) | 100% |
+| 01-19 | S8-out | liaison | - | 91 | - |
+| 01-20 | S9-in | liaison | - | 53 | - |
+| 01-20 | S9 | special | 390 | 394 (+1.0%) | 66% |
+| 01-20 | S9-out | liaison | - | 71 | - |
+| 01-21 | S10-in | liaison | - | 45 | - |
+| 01-21 | S10 | special | 470 | 464 (-1.4%) | 77% |
+| 01-21 | S10-out | liaison | - | 18 | - |
+| 01-22 | S11-in | liaison | - | 82 | - |
+| 01-22 | S11 | special | 455 | 441 (-3.2%) | 100% |
+| 01-22 | S11-out | liaison | - | 323 | - |
+| 01-23 | S12-in | liaison | - | 40 | - |
+| 01-23 | S12 | special | 22 | 21 (-3.7%) | 0% |
+| 01-23 | S12-out | liaison | - | 28 | - |
+
+Known weak points, all of them about the game, which could not be run here: the 400 km stages are one race path each (a rebase of Earth's origin
+in the middle of one is the testbed's open question, now 40 times longer); the corridor asked of Earth's server is the first 40 km of a stage;
+the Prologue ends going away from Loule, so its return liaison turns round at the finish, and a few liaisons meet their stage at 15 to 40
+degrees instead of straight; the transfer day is a loop with no stage, which the stock loop's code allows (its sequence is the return road section
+and the service park) but nobody has run; the window's day buttons were written without a way to look at them.
+
+The geometry is loaded one day at a time (`index.json` says where each leg starts); the stages of 400 km and more are the weak point, see
+the risks in the pull request that added them: nothing of this was driven in the game.
+
 ## Svolte di Popoli
 
 The second edition, `editions/svolte-di-popoli`: the Svolte di Popoli hillclimb (SR17, Abruzzo) as a rally loop with a

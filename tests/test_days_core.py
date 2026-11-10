@@ -213,3 +213,88 @@ def test_a_day_without_a_ferry_hands_over_to_the_next_day_at_the_same_place_and_
     assert lua.eval("core.status().edition") == "mini-days/d03" or True
     # the next day is the window's edition now
     assert lua.eval("core.ensureEdition('mini-days/d03')") is True
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# the 2027 edition's own files through the extension (lazy geometry, a 400 km stage, an end stall in Morocco)
+
+ED2027 = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "editions", "2027-portugal-morocco")
+
+
+class Rally:
+    """The runtime and the loading of a day's geometry files (the others are not put into the game's file system)."""
+
+    def __init__(self, lua, load_day):
+        self.lua, self.load_day = lua, load_day
+        self.eval, self.execute = lua.eval, lua.execute
+
+
+@pytest.fixture()
+def rally(lua):
+    base = read(os.path.join(ED2027, "legs.json"))
+    index = read(os.path.join(ED2027, "index.json"))
+    root = "/dakar/editions/2027-portugal-morocco/"
+    put = lua.eval("function(k, v) JSON[k] = v end")
+    put(root + "legs.json", conv(lua, base))
+    put(root + "index.json", conv(lua, index))
+    lua.execute("""
+FS.directoryList = function(self, path) return { '/dakar/editions/2027-portugal-morocco' } end
+D_MISSIONS = {}
+local inner = gameplay_missions_missions.getMissionById
+gameplay_missions_missions.getMissionById = function(id)
+  local d = id:match('dakar%-2027%-(d%d+)$')
+  if d then
+    D_MISSIONS[id] = D_MISSIONS[id] or { id = id, missionTypeData = { dakarEdition = '2027-portugal-morocco/' .. d }, startTrigger = {}, fgVariables = {},
+      defaultUserSettings = { setupModuleVehicles = 1 } }
+    return D_MISSIONS[id]
+  end
+  return inner(id)
+end
+""")
+
+    def load_day(day_id):
+        day = next(d for d in base["days"] if d["id"] == day_id)
+        for lid in day["legs"]:
+            leg = next(l for l in base["legs"] if l["id"] == lid)
+            if leg["type"] in ("special", "transfer"):
+                put(root + "geometry/%s.json" % lid, conv(lua, read(os.path.join(ED2027, "geometry", lid + ".json"))))
+    return Rally(lua, load_day)
+
+
+def test_the_window_lists_every_driven_day_of_the_route_without_reading_a_geometry_file(rally):
+    ids = rally.eval("(function() local out = {}; for _, id in ipairs(core.editionIds()) do out[#out + 1] = id end; return table.concat(out, ',') end)()")
+    assert [i for i in ids.split(",") if i.startswith("2027")] == ["2027-portugal-morocco/d%02d" % i for i in (1, 2, 3, 4, 5, 6, 7, 8, 10, 11, 12, 13, 14, 15)]
+    # (loading a day needs only the index until it is the current one: no geometry file was put into the game's file system)
+    assert rally.eval("(function() local n = 0; for k in pairs(JSON) do if tostring(k):find('2027') and tostring(k):find('geometry') then n = n + 1 end end; return n end)()") == 0
+
+
+def test_stage_4_to_zagora_ends_at_its_own_stall_in_morocco_and_stage_2_where_it_began(rally):
+    rally.load_day("d06")
+    rally.execute("PLAYER_LL = { 32.53, -1.97 }; ANCHOR_LL = { 32.5300, -1.9700 }")
+    rally.execute("core.start('2027-portugal-morocco/d06')")
+    assert abs(rally.eval("TELEPORT[1]") - 32.53) < 0.1 and abs(rally.eval("TELEPORT[2]") - -1.97) < 0.1      # (Bouarfa: the day's bivouac)
+    rally.execute("earthAnchorCommit(32.5300, -1.9700); core.onUpdate(5)")
+    assert rally.eval("STARTED") is True
+    assert logs(rally.lua, "ends at its own end stall")
+    loop = rally.eval("STARTED_ARGS[1].missionTypeData.dakarEdition")
+    assert loop == "2027-portugal-morocco/d06"
+    keys = sorted(str(k) for k in rally.eval("FILES").keys())
+    assert "/gameplay/missions/beamng_earth/rallyStage/dakar-2027-d06-S4/race.race.json" in keys
+    assert not any("dakar-2027-d07" in k for k in keys)
+
+
+def test_the_day_after_a_stage_of_nearly_500_km_is_offered_when_it_is_finished(rally):
+    rally.load_day("d06")
+    rally.execute("PLAYER_LL = { 32.53, -1.97 }; ANCHOR_LL = { 32.5300, -1.9700 }")
+    rally.execute("core.start('2027-portugal-morocco/d06'); earthAnchorCommit(32.5300, -1.9700); core.onUpdate(5)")
+    rally.execute("core.onAnyMissionChanged('started', STARTED_ARGS[1])")
+    rally.execute("""
+RM = { schedule = {}, events = {} }
+function RM.getCurrentMissionId(self) return 'serviceIn' end
+gameplay_rallyLoop = { getManager = function() return RM end }
+M6 = STARTED_ARGS[1]
+""")
+    rally.execute("core.onUpdate(2)")
+    rally.execute("CAR = { M6.missionTypeData.serviceStallPos[1], M6.missionTypeData.serviceStallPos[2], M6.missionTypeData.serviceStallPos[3] }")
+    rally.execute("core.onAnyMissionWillChange('stopped', M6, false); core.onAnyMissionChanged('stopped', M6)")
+    assert any("Stage 5" in m and "starts here" in m for m in logs(rally.lua, "is finished"))

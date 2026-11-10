@@ -1,0 +1,119 @@
+{
+  "additionalAttributes": {},
+  "author": "BeamNG",
+  "careerSetup": {
+    "defaultStarKeys": [
+      "bronzeTime",
+      "silverTime",
+      "goldTime"
+    ],
+    "showInFreeroam": true,
+    "skill": "(none)",
+    "starOutroTexts": {},
+    "starRewards": {},
+    "starsActive": {
+      "bronzeTime": true,
+      "goldTime": true,
+      "silverTime": true
+    }
+  },
+  "customAdditionalAttributes": {},
+  "date": 1794184296,
+  "description": "Stage 10: Smara loop (2027-01-21, bivouac: Smara). The route is approximate where ASO has not published it: see the edition's notes.",
+  "devMission": false,
+  "grouping": {
+    "id": "",
+    "label": ""
+  },
+  "layers": [
+    {
+      "dir": "/gameplay/missions/beamng_earth/rallyLoop/dakar-2027-d13/",
+      "fixed": true,
+      "isMissionFolderDir": true,
+      "isMissionTypeDir": false
+    },
+    {
+      "dir": "/gameplay/missionTypes/rallyLoop/",
+      "fixed": true,
+      "isMissionFolderDir": false,
+      "isMissionTypeDir": true
+    }
+  ],
+  "missionType": "rallyLoop",
+  "missionTypeData": {
+    "dakarEdition": "2027-portugal-morocco/d13",
+    "devDisableTraffic": false,
+    "endScreenText": "missions.missions.rally.endScreen.loopText",
+    "loopTimes": "8:00, 13:00",
+    "outroTitleText": "missions.missions.rally.endScreen.loopTitle",
+    "return_rallyRoadSection": "Dakar 2027: Portugal - Morocco: Stage 10: Stage 10 finish to Smara (beamng_earth/rallyRoadSection/dakar-2027-d13-S10-out)",
+    "serviceStallPos": [
+      0,
+      0,
+      0
+    ],
+    "serviceStallRot": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "serviceStallScl": 5,
+    "stage1_rallyRoadSection": "Dakar 2027: Portugal - Morocco: Stage 10: Smara to stage 10 (beamng_earth/rallyRoadSection/dakar-2027-d13-S10-in)",
+    "stage1_rallyStage": "Dakar 2027: Portugal - Morocco: Stage 10: Stage 10, Smara loop (beamng_earth/rallyStage/dakar-2027-d13-S10)",
+    "stage2_rallyRoadSection": "<none>",
+    "stage2_rallyStage": "<none>",
+    "stage3_rallyRoadSection": "<none>",
+    "stage3_rallyStage": "<none>",
+    "stage4_rallyRoadSection": "<none>",
+    "stage4_rallyStage": "<none>",
+    "startScreenText": "",
+    "startingSSNumber": 10
+  },
+  "name": "Dakar 2027: Portugal - Morocco: Stage 10",
+  "retryBehaviour": "infiniteRetries",
+  "setupModules": {
+    "environment": {
+      "enabled": false
+    },
+    "traffic": {
+      "enabled": false
+    },
+    "vehicles": {
+      "enabled": true,
+      "includePlayerVehicle": true,
+      "playerVehicleDiffs": {},
+      "prioritizePlayerVehicle": false,
+      "vehicles": [
+        {
+          "config": "rally_am_asphalt",
+          "configPath": "vehicles/sunburst2/rally_am_asphalt.pc",
+          "model": "sunburst2",
+          "useCustomConfig": false
+        }
+      ]
+    }
+  },
+  "startCondition": {
+    "type": "always"
+  },
+  "startTrigger": {
+    "level": "beamng_earth",
+    "pos": [
+      0,
+      0,
+      0
+    ],
+    "radius": 3,
+    "rot": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "type": "coordinates"
+  },
+  "visibleCondition": {
+    "type": "always"
+  }
+}

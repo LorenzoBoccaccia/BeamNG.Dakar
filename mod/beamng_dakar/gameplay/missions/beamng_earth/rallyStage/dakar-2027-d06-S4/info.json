@@ -1,0 +1,98 @@
+{
+  "additionalAttributes": {},
+  "author": "BeamNG",
+  "careerSetup": {
+    "defaultStarKeys": [
+      "bronzeTime",
+      "silverTime",
+      "goldTime"
+    ],
+    "showInFreeroam": true,
+    "skill": "(none)",
+    "starOutroTexts": {},
+    "starRewards": {},
+    "starsActive": {
+      "bronzeTime": true,
+      "goldTime": true,
+      "silverTime": true
+    }
+  },
+  "customAdditionalAttributes": {},
+  "date": 1794184296,
+  "description": "Stage 4: Bouarfa to Zagora via Merzouga: a timed stage of 493 km (published special length 490 km).",
+  "devMission": true,
+  "grouping": {
+    "id": "",
+    "label": ""
+  },
+  "layers": [
+    {
+      "dir": "/gameplay/missions/beamng_earth/rallyStage/dakar-2027-d06-S4/",
+      "fixed": true,
+      "isMissionFolderDir": true,
+      "isMissionTypeDir": false
+    },
+    {
+      "dir": "/gameplay/missionTypes/rallyStage/",
+      "fixed": true,
+      "isMissionFolderDir": false,
+      "isMissionTypeDir": true
+    }
+  ],
+  "missionType": "rallyStage",
+  "missionTypeData": {
+    "baselineTime": 27401.0,
+    "bronzeTime": 41102.0,
+    "bronzeTimePenalty": 20,
+    "bronzeTimeTotal": 41102.0,
+    "endScreenText": "",
+    "goldTime": 27401.0,
+    "goldTimePenalty": 0,
+    "goldTimeTotal": 27401.0,
+    "justFinishPenalty": 30,
+    "outroTitleText": "missions.missions.rally.endScreen.stageTitle",
+    "silverTime": 32881.0,
+    "silverTimePenalty": 10,
+    "silverTimeTotal": 32881.0,
+    "startScreenText": ""
+  },
+  "name": "Dakar 2027: Portugal - Morocco: Stage 4: Stage 4, Merzouga",
+  "retryBehaviour": "infiniteRetries",
+  "setupModules": {
+    "environment": {
+      "enabled": false
+    },
+    "traffic": {
+      "enabled": false
+    },
+    "vehicles": {
+      "enabled": true,
+      "includePlayerVehicle": true,
+      "playerVehicleDiffs": {},
+      "prioritizePlayerVehicle": true,
+      "vehicles": {}
+    }
+  },
+  "startCondition": {
+    "type": "never"
+  },
+  "startTrigger": {
+    "level": "beamng_earth",
+    "pos": [
+      0,
+      0,
+      0
+    ],
+    "radius": 3,
+    "rot": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "type": "coordinates"
+  },
+  "visibleCondition": {
+    "type": "never"
+  }
+}

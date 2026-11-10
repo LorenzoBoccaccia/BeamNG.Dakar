@@ -1,0 +1,98 @@
+{
+  "additionalAttributes": {},
+  "author": "BeamNG",
+  "careerSetup": {
+    "defaultStarKeys": [
+      "bronzeTime",
+      "silverTime",
+      "goldTime"
+    ],
+    "showInFreeroam": true,
+    "skill": "(none)",
+    "starOutroTexts": {},
+    "starRewards": {},
+    "starsActive": {
+      "bronzeTime": true,
+      "goldTime": true,
+      "silverTime": true
+    }
+  },
+  "customAdditionalAttributes": {},
+  "date": 1794184296,
+  "description": "Stage 5: Zagora loop, Erg Chegaga: a timed stage of 379 km (published special length 365 km).",
+  "devMission": true,
+  "grouping": {
+    "id": "",
+    "label": ""
+  },
+  "layers": [
+    {
+      "dir": "/gameplay/missions/beamng_earth/rallyStage/dakar-2027-d07-S5/",
+      "fixed": true,
+      "isMissionFolderDir": true,
+      "isMissionTypeDir": false
+    },
+    {
+      "dir": "/gameplay/missionTypes/rallyStage/",
+      "fixed": true,
+      "isMissionFolderDir": false,
+      "isMissionTypeDir": true
+    }
+  ],
+  "missionType": "rallyStage",
+  "missionTypeData": {
+    "baselineTime": 21043.0,
+    "bronzeTime": 31564.0,
+    "bronzeTimePenalty": 20,
+    "bronzeTimeTotal": 31564.0,
+    "endScreenText": "",
+    "goldTime": 21043.0,
+    "goldTimePenalty": 0,
+    "goldTimeTotal": 21043.0,
+    "justFinishPenalty": 30,
+    "outroTitleText": "missions.missions.rally.endScreen.stageTitle",
+    "silverTime": 25252.0,
+    "silverTimePenalty": 10,
+    "silverTimeTotal": 25252.0,
+    "startScreenText": ""
+  },
+  "name": "Dakar 2027: Portugal - Morocco: Stage 5: Stage 5, Erg Chegaga",
+  "retryBehaviour": "infiniteRetries",
+  "setupModules": {
+    "environment": {
+      "enabled": false
+    },
+    "traffic": {
+      "enabled": false
+    },
+    "vehicles": {
+      "enabled": true,
+      "includePlayerVehicle": true,
+      "playerVehicleDiffs": {},
+      "prioritizePlayerVehicle": true,
+      "vehicles": {}
+    }
+  },
+  "startCondition": {
+    "type": "never"
+  },
+  "startTrigger": {
+    "level": "beamng_earth",
+    "pos": [
+      0,
+      0,
+      0
+    ],
+    "radius": 3,
+    "rot": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "type": "coordinates"
+  },
+  "visibleCondition": {
+    "type": "never"
+  }
+}

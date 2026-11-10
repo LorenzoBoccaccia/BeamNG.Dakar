@@ -1,0 +1,98 @@
+{
+  "additionalAttributes": {},
+  "author": "BeamNG",
+  "careerSetup": {
+    "defaultStarKeys": [
+      "bronzeTime",
+      "silverTime",
+      "goldTime"
+    ],
+    "showInFreeroam": true,
+    "skill": "(none)",
+    "starOutroTexts": {},
+    "starRewards": {},
+    "starsActive": {
+      "bronzeTime": true,
+      "goldTime": true,
+      "silverTime": true
+    }
+  },
+  "customAdditionalAttributes": {},
+  "date": 1794184296,
+  "description": "Stage 9: marathon refuge to Smara: a timed stage of 394 km (published special length 390 km).",
+  "devMission": true,
+  "grouping": {
+    "id": "",
+    "label": ""
+  },
+  "layers": [
+    {
+      "dir": "/gameplay/missions/beamng_earth/rallyStage/dakar-2027-d12-S9/",
+      "fixed": true,
+      "isMissionFolderDir": true,
+      "isMissionTypeDir": false
+    },
+    {
+      "dir": "/gameplay/missionTypes/rallyStage/",
+      "fixed": true,
+      "isMissionFolderDir": false,
+      "isMissionTypeDir": true
+    }
+  ],
+  "missionType": "rallyStage",
+  "missionTypeData": {
+    "baselineTime": 21886.0,
+    "bronzeTime": 32829.0,
+    "bronzeTimePenalty": 20,
+    "bronzeTimeTotal": 32829.0,
+    "endScreenText": "",
+    "goldTime": 21886.0,
+    "goldTimePenalty": 0,
+    "goldTimeTotal": 21886.0,
+    "justFinishPenalty": 30,
+    "outroTitleText": "missions.missions.rally.endScreen.stageTitle",
+    "silverTime": 26263.0,
+    "silverTimePenalty": 10,
+    "silverTimeTotal": 26263.0,
+    "startScreenText": ""
+  },
+  "name": "Dakar 2027: Portugal - Morocco: Stage 9: Stage 9, back to Smara",
+  "retryBehaviour": "infiniteRetries",
+  "setupModules": {
+    "environment": {
+      "enabled": false
+    },
+    "traffic": {
+      "enabled": false
+    },
+    "vehicles": {
+      "enabled": true,
+      "includePlayerVehicle": true,
+      "playerVehicleDiffs": {},
+      "prioritizePlayerVehicle": true,
+      "vehicles": {}
+    }
+  },
+  "startCondition": {
+    "type": "never"
+  },
+  "startTrigger": {
+    "level": "beamng_earth",
+    "pos": [
+      0,
+      0,
+      0
+    ],
+    "radius": 3,
+    "rot": [
+      0,
+      0,
+      0,
+      1
+    ],
+    "type": "coordinates"
+  },
+  "visibleCondition": {
+    "type": "never"
+  }
+}

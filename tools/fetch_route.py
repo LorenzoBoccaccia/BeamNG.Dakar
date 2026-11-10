@@ -282,13 +282,18 @@ def main():
     if unknown:
         raise SystemExit("not a driven leg: %s" % ", ".join(sorted(unknown)))
     # (a plan of lengths alone is not joined, nor in a lot: it asks the router for the routes and nothing else)
-    items = legplan.plan_edition([l for l in legs if l["id"] in only] if (plan_only and only) else legs, router, None if plan_only else find_lot, join=not plan_only)
+    plan_legs = legs
+    if only and plan_only:
+        plan_legs = [l for l in legs if l["id"] in only]
+    elif only and base.get("days"):
+        # (the days of the wanted legs: a day's legs are joined to each other, the days before and after are not touched)
+        wanted = {i for d in base["days"] if only & set(d["legs"]) for i in d["legs"]}
+        plan_legs = [l for l in legs if l["id"] in wanted]
+    items = legplan.plan_edition(plan_legs, router, None if plan_only else find_lot, join=not plan_only)
     index_path = os.path.join(ed, "index.json")
     index = read_index(index_path)
     for it in items:
         leg, pts = it["leg"], it["pts"]
-        if only and leg["id"] not in only:
-            continue
         length = length_of(pts)
         want = official_km(leg)
         rep = _reports.get(leg["id"]) or {}

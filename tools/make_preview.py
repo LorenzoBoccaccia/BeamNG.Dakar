@@ -3,6 +3,8 @@ r"""Draw the mission list pictures of an edition's loop from its route geometry 
 
     python tools/make_preview.py editions/testbed-algarve
 
+An edition of days (legs.json "days"): one picture pair per day's loop (the legs' own missions are hidden ones and have none).
+
 Writes preview.jpg (1920x1080) and thumbnail.jpg (200x200), the names the game's mission list looks for next to a
 mission's info.json, into the loop's mission folder and into each leg's (a stage shows its own route). The picture is a
 plain drawn map (no map data is fetched): the legs in the edition's geometry on a warm desert gradient, the service
@@ -94,11 +96,49 @@ def make(edition, geometry, legs, title, subtitle):
     return big, t
 
 
+def thin(points, keep=600):
+    """A long line drawn with about `keep` of its points: a 400 km stage is 24,000 and the picture is 1920 pixels wide."""
+    step = max(1, len(points) // keep)
+    return points[::step] + ([points[-1]] if (len(points) - 1) % step else [])
+
+
+def day_jobs(edition_dir, edition):
+    """The loops of an edition of days: [(mission folder, pseudo edition, geometry, title, subtitle)], one per driven day. Only the day's own
+    geometry is read at a time (the whole route is tens of megabytes). The legs' own missions are hidden ones and have no picture."""
+    by = {l["id"]: l for l in edition["legs"]}
+    prefix = edition.get("missionPrefix", "dakar")
+    for day in edition["days"]:
+        legs = [by[i] for i in day["legs"] if by[i]["type"] in ("special", "transfer")]
+        if not legs:
+            continue
+        geometry = {}
+        for leg in legs:
+            path = os.path.join(edition_dir, "geometry", leg["id"] + ".json")
+            if not os.path.isfile(path):
+                sys.exit("no geometry for %s: run tools/fetch_route.py first" % leg["id"])
+            g = json.load(open(path, encoding="utf-8"))
+            geometry[leg["id"]] = {"points": thin(g["points"]), "lengthM": g["lengthM"]}
+        km = sum(g["lengthM"] for g in geometry.values()) / 1000
+        sk = sum(geometry[l["id"]]["lengthM"] for l in legs if l["type"] == "special") / 1000
+        sub = "%s  %d km driven, %.0f km timed" % (day.get("date", ""), round(km), sk) if sk else "%s  %d km driven" % (day.get("date", ""), round(km))
+        yield (os.path.join(MISSIONS, "rallyLoop", prefix + "-" + day["id"]), {"legs": legs}, geometry, day.get("title") or day["id"], sub)
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("edition_dir")
     a = ap.parse_args()
     edition = json.load(open(os.path.join(a.edition_dir, "legs.json"), encoding="utf-8"))
+    if edition.get("days"):
+        for folder, pseudo, geometry, t, sub in day_jobs(a.edition_dir, edition):
+            if not os.path.isdir(folder):
+                print("skip (no mission folder, run tools/make_missions.py):", folder)
+                continue
+            big, small = make(pseudo, geometry, list(range(len(pseudo["legs"]))), t, sub)
+            big.save(os.path.join(folder, "preview.jpg"), quality=82)
+            small.save(os.path.join(folder, "thumbnail.jpg"), quality=88)
+            print("wrote", os.path.relpath(folder, ROOT))
+        return
     geometry = {}
     for leg in edition["legs"]:
         path = os.path.join(a.edition_dir, "geometry", leg["id"] + ".json")

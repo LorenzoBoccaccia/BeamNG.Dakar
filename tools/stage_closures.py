@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Where the side roads meet a special stage, for closing them off.
 
-    python tools/stage_closures.py editions/testbed-algarve
+    python tools/stage_closures.py editions/testbed-algarve [leg ids]
 
 A special stage runs on public roads: every other drivable road that meets it is a way off the stage, and a real closed
 stage has a barrier across each of them. For every leg of type "special" in <edition>/legs.json this reads the road
@@ -315,25 +315,59 @@ def fetch_roads(stage_ll):
     return out
 
 
+LONG_STAGE_M = 60000.0                # a stage longer than this is read from the Overture tiles tools/roadnet.py keeps and worked in pieces
+PIECE_M = 25000.0                     # ... of this length (the work is per road near the stage: a whole 490 km line at once is slow for nothing)
+PIECE_OVERLAP_M = 300.0               # ... overlapping this much; a closure in the overlap belongs to the piece it is nearer the middle of
+
+
+def closures_long(stage_ll):
+    """closures() for a long stage: roads from the cached tiles (only those near the line), the line in overlapping pieces."""
+    import roadnet
+    cum = [0.0]
+    for a, b in zip(stage_ll, stage_ll[1:]):
+        cum.append(cum[-1] + roadnet.metres(a, b))
+    recs = [{"line": r["line"], "class": r["cls"], "subclass": r["sub"], "elevated": r["elevated"]}
+            for r in roadnet.roads_along(stage_ll, 60.0)]
+    total, out, start = cum[-1], [], 0.0
+    while start < total:
+        end = min(total, start + PIECE_M)
+        lo, hi = max(0.0, start - PIECE_OVERLAP_M), min(total, end + PIECE_OVERLAP_M)
+        piece = [p for p, c in zip(stage_ll, cum) if lo <= c <= hi]
+        if len(piece) >= 2:
+            for c in closures(piece, recs):
+                s_abs = c["s"] + lo
+                if start <= s_abs < end or (end >= total and s_abs >= start):
+                    c["s"] = round(s_abs, 1)
+                    out.append(c)
+        start = end
+    return out, len(recs)
+
+
 def main():
-    if len(sys.argv) != 2:
+    if len(sys.argv) < 2:
         raise SystemExit(__doc__)
     ed = sys.argv[1]
-    from fetch_route import height
+    from fetch_route import height, prefetch_heights
     legs = json.load(open(os.path.join(ed, "legs.json"), encoding="utf-8"))["legs"]
+    want = sys.argv[2:]
     os.makedirs(os.path.join(ed, "closures"), exist_ok=True)
     for leg in legs:
-        if leg["type"] != "special":
+        if leg["type"] != "special" or (want and leg["id"] not in want):
             continue
         g = json.load(open(os.path.join(ed, "geometry", leg["id"] + ".json"), encoding="utf-8"))
         stage_ll = [(p[0], p[1]) for p in g["points"]]
-        recs = fetch_roads(stage_ll)
-        cl = closures(stage_ll, recs)
+        if g["lengthM"] > LONG_STAGE_M:
+            cl, nrec = closures_long(stage_ll)
+        else:
+            recs = fetch_roads(stage_ll)
+            nrec = len(recs)
+            cl = closures(stage_ll, recs)
+        prefetch_heights([(c["lat"], c["lon"]) for c in cl]) if cl else None
         for c in cl:
             c["h"] = round(float(height(c["lat"], c["lon"])), 2)
         with open(os.path.join(ed, "closures", leg["id"] + ".json"), "w", encoding="utf-8") as f:
             json.dump({"id": leg["id"], "closures": cl}, f, separators=(",", ":"))
-        print("%s: %d road segments read, %d closures along %.1f km" % (leg["id"], len(recs), len(cl), g["lengthM"] / 1000))
+        print("%s: %d road segments read, %d closures along %.1f km" % (leg["id"], nrec, len(cl), g["lengthM"] / 1000), flush=True)
 
 
 if __name__ == "__main__":

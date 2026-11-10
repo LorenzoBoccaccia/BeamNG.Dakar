@@ -33,6 +33,7 @@ local preload = require('beamngDakar/preload')
 local earthapi = require('beamngDakar/earthapi')
 local hud = require('beamngDakar/hud')
 local guide = require('beamngDakar/guide')
+local days = require('beamngDakar/days')
 
 local EDITIONS_DIR = '/dakar/editions/'                  -- in the mod (tools/install.py copies editions/ there)
 local MISSIONS_DIR = '/gameplay/missions/beamng_earth/'  -- mission ids are <level>/<type>/<name>; the level is Earth's
@@ -206,15 +207,57 @@ local function missionName(edition, leg) return (edition.missionPrefix or 'dakar
 local function missionType(leg) return leg.type == 'special' and 'rallyStage' or 'rallyRoadSection' end
 local function missionDirOf(leg) return MISSIONS_DIR .. missionType(leg) .. '/' .. missionName(st.edition, leg) end
 
+-- The edition's legs.json, read once ("<edition>" is the folder; a day's id "<edition>/<day id>" names the same folder).
+local function readBase(id)
+  local baseId = days.splitId(id)
+  st.bases = st.bases or {}
+  if st.bases[baseId] == nil then st.bases[baseId] = jsonReadFile(EDITIONS_DIR .. baseId .. '/legs.json') or false end
+  return st.bases[baseId] or nil, baseId
+end
+
+-- The geometry of an edition of days, a leg's file read the first time it is asked for: the 2027 route's files are tens of
+-- megabytes in all, and the window, the mission list and the start triggers of every day only need where a leg starts
+-- (index.json, tools/fetch_route.py). Only the legs the day runs have a file to read.
+local function lazyGeometry(dir, edition)
+  local own = {}
+  for _, leg in ipairs(edition.legs) do own[leg.id] = true end
+  return setmetatable({}, { __index = function(t, id)
+    if not own[id] then return nil end
+    local g = jsonReadFile(dir .. 'geometry/' .. id .. '.json')
+    if g then rawset(t, id, g) end
+    return g
+  end })
+end
+
 local function loadEdition(id)
-  local dir = EDITIONS_DIR .. id .. '/'
-  local edition = jsonReadFile(dir .. 'legs.json')
-  if not edition then return nil, 'no ' .. dir .. 'legs.json (run tools/install.py)' end
-  local geometry = {}
-  for _, leg in ipairs(edition.legs) do
-    local g = jsonReadFile(dir .. 'geometry/' .. leg.id .. '.json')
-    if not g then return nil, 'no geometry for leg ' .. leg.id .. ' (run tools/fetch_route.py)' end
-    geometry[leg.id] = g
+  local base, baseId = readBase(id)
+  local dir = EDITIONS_DIR .. baseId .. '/'
+  if not base then return nil, 'no ' .. dir .. 'legs.json (run tools/install.py)' end
+  local edition, lazy = base, false
+  local _, dayId = days.splitId(id)
+  if base.days then
+    -- an edition of days: the view of one day (its loop), not the whole route
+    edition = dayId and days.find(base, id) or nil
+    if not edition then return nil, id .. ' is not a day of ' .. baseId end
+    if edition.kind == 'rest' then return nil, edition.label .. ' is a rest day: nothing to drive' end
+    lazy = true
+  end
+  local geometry, index = {}, nil
+  if lazy then
+    geometry = lazyGeometry(dir, edition)
+    index = jsonReadFile(dir .. 'index.json') or nil
+    for _, leg in ipairs(edition.legs) do
+      -- (the index says a leg has its file; without one the file is read here to know it is there, and let go again)
+      local there = index and index.legs and index.legs[leg.id] or (not index and geometry[leg.id])
+      if not there then return nil, 'no geometry for leg ' .. leg.id .. ' (run tools/fetch_route.py)' end
+    end
+    if not index then for k in pairs(geometry) do rawset(geometry, k, nil) end end
+  else
+    for _, leg in ipairs(edition.legs) do
+      local g = jsonReadFile(dir .. 'geometry/' .. leg.id .. '.json')
+      if not g then return nil, 'no geometry for leg ' .. leg.id .. ' (run tools/fetch_route.py)' end
+      geometry[leg.id] = g
+    end
   end
   -- where the side roads of a special stage are closed off (tools/stage_closures.py); optional: an edition
   -- without the files just has no closures
@@ -222,19 +265,47 @@ local function loadEdition(id)
   for _, leg in ipairs(edition.legs) do
     if leg.type == 'special' then closures[leg.id] = jsonReadFile(dir .. 'closures/' .. leg.id .. '.json') end
   end
-  return edition, geometry, closures
+  return edition, geometry, closures, index, lazy and dir or nil
 end
 
 -- An edition is read once and kept: the mission list, the window and the start triggers of every edition's loop ask for
--- them again and again (a second edition must not cost the first its start marker).
+-- them again and again (a second edition must not cost the first its start marker). A day's geometry is let go when
+-- another day becomes the current one (unloadDays).
 local function loadCached(id)
   local c = st.loaded[id]
   if c then return c end
-  local edition, geometry, closures = loadEdition(id)
+  local edition, geometry, closures, index, dir = loadEdition(id)
   if not edition then return nil, geometry end
-  c = { edition = edition, geometry = geometry, closures = closures }
+  c = { edition = edition, geometry = geometry, closures = closures, index = index or nil, dir = dir }
   st.loaded[id] = c
   return c
+end
+
+-- Where a leg starts ({ lat, lon, h }): the index's, else the geometry's first point.
+local function legStart(c, leg)
+  local ix = c.index and c.index.legs and c.index.legs[leg.id]
+  if ix and ix.start then return ix.start end
+  local g = c.geometry[leg.id]
+  return g and g.points and g.points[1] or nil
+end
+
+-- The geometry (and the curated lines) of the days other than `keep` are let go: a day's legs are read again when it is the current
+-- one. One-loop editions keep theirs.
+local function unloadDays(keep)
+  for id, c in pairs(st.loaded) do
+    if c.dir and id ~= keep then
+      c.geometry = lazyGeometry(c.dir, c.edition)
+      c.curated, c.curatedSummary = nil, nil
+    end
+  end
+end
+
+-- The day after edition view `ed` and the rest days between them (days.following); nil for a one-loop edition and the last day.
+local function dayAfter(ed)
+  local base = ed and ed.baseEdition and readBase(ed.edition)
+  local views = base and days.expand(base)
+  if not (views and ed.index and views[ed.index]) then return nil end
+  return days.following(views, views[ed.index])
 end
 
 -- The curated line of each special stage of the current edition (curate.lua), made once per edition: the
@@ -273,17 +344,27 @@ local function ensureEdition(id)
   if st.edition and st.edition.edition == id and st.geometry then return true end
   local c, err = loadCached(id)
   if not c then return false, err end
-  st.edition, st.geometry, st.closures = c.edition, c.geometry, c.closures
+  unloadDays(id)
+  st.edition, st.geometry, st.closures, st.index = c.edition, c.geometry, c.closures, c.index
   return true
 end
 
--- The ids of the installed editions (the folders of EDITIONS_DIR with a legs.json), found once. When the game cannot
--- list the folder, the editions already read and the default one.
+-- The ids of the installed editions (the folders of EDITIONS_DIR with a legs.json), found once: an edition of days is one id per
+-- day that has a loop ("<edition>/<day id>"). When the game cannot list the folder, the editions already read and the default one.
 local function editionIds()
   if st.editionIds then return st.editionIds end
   local ids, seen = {}, {}
   local function add(id)
-    if id and not seen[id] and jsonReadFile(EDITIONS_DIR .. id .. '/legs.json') then seen[id] = true; ids[#ids + 1] = id end
+    if not id then return end
+    local base, baseId = readBase(id)
+    if not base then return end
+    if base.days then
+      for _, v in ipairs(days.expand(base)) do
+        if v.kind ~= 'rest' and not seen[v.edition] then seen[v.edition] = true; ids[#ids + 1] = v.edition end
+      end
+    elseif not seen[baseId] then
+      seen[baseId] = true; ids[#ids + 1] = baseId
+    end
   end
   local fs = rawget(_G, 'FS')
   if fs and fs.directoryList then
@@ -300,12 +381,21 @@ local function editionIds()
 end
 
 -- Where an edition's service park is: where the car starts in the lot (servicePark.spawn of its first leg's
--- geometry), else the first leg's first point (the current edition unless one is given).
-local function servicePark(edition, geometry)
-  local g = (geometry or st.geometry)[(edition or st.edition).legs[1].id]
+-- geometry), else the first leg's first point (the current edition unless one is given). An edition of days has it in its index
+-- (the first leg's geometry is read only when the day is the current one).
+local function servicePark(edition, geometry, index)
+  edition = edition or st.edition
+  index = index == nil and st.index or index
+  local first = edition.legs[1]
+  local ix = index and index.legs and index.legs[first.id]
+  if ix and (ix.spawn or ix.start) then
+    local p = ix.spawn or ix.start
+    return p[1], p[2], p[3]
+  end
+  local g = (geometry or st.geometry)[first.id]
   local lot = g.servicePark
-  local first = (lot and lot.spawn and { lot.spawn.lat, lot.spawn.lon, lot.spawn.h }) or g.points[1]
-  return first[1], first[2], first[3]
+  local pt = (lot and lot.spawn and { lot.spawn.lat, lot.spawn.lon, lot.spawn.h }) or g.points[1]
+  return pt[1], pt[2], pt[3]
 end
 
 local function earthState()
@@ -558,6 +648,8 @@ local function groundAt(x, y, hint)
   return nil
 end
 M.groundAt = groundAt
+M.ensureEdition = ensureEdition      -- (the window's pick; the tests')
+M.editionIds = editionIds
 
 local PROP_SNAP_M = 400            -- a prop this close to the player is put on the real ground
 local PROP_SNAP_MIN_M = 0.2          -- (and not touched for less)
@@ -1279,6 +1371,13 @@ function M.onAnyMissionChanged(state, mission)
       ownLog('I', 'the loop stopped: idle again')
       if placeTrigger then pcall(placeTrigger) end
     end
+    -- a day of an edition of days finished (M.onAnyMissionWillChange saw the car at its end): what comes next
+    local ds, ed = st.dayStop, st.edition
+    st.dayStop, st.dayEnd = nil, nil
+    if ds and ds.finished and ed and ed.edition == ds.edition then
+      local ok, err = pcall(M.completeDay, ed)
+      if not ok then ownLog('E', 'finishing the day failed: ' .. tostring(err)) end
+    end
   end
 end
 
@@ -1317,6 +1416,12 @@ function M.onAnchor(lat, lon)
     st.launchAt = st.clock + LAUNCH_DELAY_S
     ownLog('I', string.format('anchor %.5f, %.5f after the teleport; %s in %d s', lat, lon,
       st.noLaunch and 'waiting for the roads' or 'launching', LAUNCH_DELAY_S))
+    if st.ferryLanding then
+      local nxt = st.ferryLanding
+      st.ferryLanding = nil
+      tell(string.format('Dakar: landed. %s%s starts here: start it from the mission list.', nxt.label or nxt.title,
+        nxt.date and (' (' .. nxt.date .. ')') or ''))
+    end
   end
   if placeTrigger then placeTrigger() end
   if scenery.active then pcall(shapeRefresh) end       -- (the stages' world points are in the new frame now)
@@ -1389,6 +1494,15 @@ function M.interceptStart(mission, userSettings, startingOptions)
   if not ok then tell('Dakar: ' .. tostring(err)); return true end
   local where = whereIsTheStart()
   if not where then tell('Dakar: the player position is not known yet; try again in a moment.'); return true end
+  if where.metres > START_RADIUS_M and st.edition.teleportStart then
+    -- an edition of days: each day's bivouac is far from the last (a different country, even), so starting a day from the
+    -- mission list takes you there first, as a menu start does, and starts it with the settings the list passed
+    ownLog('I', string.format('start of %s: %.0f km from its service park, teleporting there first', tostring(mission.id), where.metres / 1000))
+    st.pending = { mission = mission, userSettings = userSettings, startingOptions = startingOptions }
+    M.start(edition)
+    if st.phase ~= 'teleporting' then st.pending = nil end
+    return true
+  end
   if where.metres > START_RADIUS_M then
     local gps = earthapi.gpsSet(where.lat, where.lon, st.edition.title or edition)
     st.startGps = gps and { where.lat, where.lon } or nil
@@ -1529,6 +1643,22 @@ local function drawHud()
   end
   im.End()
 end
+-- The editions the window lists: one group per folder, an edition of days with its days (the ids editionIds finds, in order).
+local function windowGroups()
+  local groups, byKey = {}, {}
+  for _, id in ipairs(editionIds()) do
+    local baseId = days.splitId(id)
+    local g = byKey[baseId]
+    if not g then
+      local base = readBase(id)
+      g = { key = baseId, title = base and base.title or baseId, ids = {} }
+      byKey[baseId] = g
+      groups[#groups + 1] = g
+    end
+    g.ids[#g.ids + 1] = id
+  end
+  return groups
+end
 local function drawWindow()
   im = im or rawget(_G, 'ui_imgui')
   if not im then return end
@@ -1545,11 +1675,31 @@ local function drawWindow()
     im.Text('Props standing: ' .. n .. (scenery.bias and string.format('   ground offset %.1f m', scenery.bias) or ''))
     if st.phase == 'idle' or st.phase == 'running' then
       -- the edition the service park and the buttons are for; not changed under a loop that is on
-      local ids = editionIds()
-      if #ids > 1 and not scenery.active then
-        for _, id in ipairs(ids) do
-          local c = loadCached(id)
-          if c and im.Button(((st.edition and st.edition.edition == id) and '> ' or '') .. (c.edition.title or id)) then ensureEdition(id) end
+      local groups = windowGroups()
+      if #groups > 1 and not scenery.active then
+        for _, g in ipairs(groups) do
+          local here = st.edition and days.splitId(st.edition.edition) == g.key
+          if im.Button((here and '> ' or '') .. g.title) then ensureEdition(here and st.edition.edition or g.ids[1]) end
+        end
+      end
+      -- an edition of days: the day the buttons are for, the ones either side of it and what comes between (a rest day, the ferry)
+      local cur = st.edition
+      if cur and cur.baseEdition and not scenery.active then
+        local g
+        for _, grp in ipairs(groups) do if grp.key == cur.baseEdition then g = grp end end
+        local at = 1
+        for i, id in ipairs(g and g.ids or {}) do if id == cur.edition then at = i end end
+        if g and at > 1 and im.Button('<') then ensureEdition(g.ids[at - 1]) end
+        if g and at > 1 then im.SameLine() end
+        im.Text(string.format('%s  %s  (day %d of %d)', cur.label or cur.edition, cur.date or '', at, g and #g.ids or 1))
+        if g and at < #g.ids then
+          im.SameLine()
+          if im.Button('>') then ensureEdition(g.ids[at + 1]) end
+        end
+        local nxt, rests = dayAfter(cur)
+        if rests and rests[1] then im.Text(string.format('After it: %s (%s), no driving.', rests[1].label, rests[1].bivouac or '')) end
+        if cur.ferry and cur.ferry.to then
+          if im.Button('Take the ferry now: teleport to ' .. tostring(cur.ferry.to.name or 'the landing')) then M.crossFerry(cur, nxt) end
         end
       end
       local where = whereIsTheStart()
@@ -1652,6 +1802,8 @@ local function launch()
   -- the loop's own positions (the service stall, the start trigger) are world numbers in the current frame too; the car is
   -- put there by the mission, half a metre above the ground (the route already lies on it).
   local pl = res.placement
+  -- (the stall where the loop puts the car, kept as lat/lon: a day that ends elsewhere has it set back here, see setStall)
+  local sLat, sLon, sH = st.anchor:worldToGeodetic(pl.pos[1], pl.pos[2], pl.pos[3])
   -- (the car starts in the parking lot with TC0 a few metres ahead of it; without a lot the stall stands back
   -- from TC0: on the game's ground there, else at the height of the data)
   local gzStall = groundAt(pl.pos[1], pl.pos[2], pl.pos[3])
@@ -1667,6 +1819,21 @@ local function launch()
   mission.startTrigger.pos, mission.startTrigger.rot = pl.pos, pl.dirRot
   if mission.fgVariables then
     mission.fgVariables.serviceStallPos, mission.fgVariables.serviceStallRot = pl.pos, pl.rot
+  end
+  -- an edition of days: where the day ends (a day that does not end where it began has its end stall elsewhere, see dayStallTick)
+  st.dayEnd = nil
+  if st.edition.baseEdition then
+    local lastLeg = st.edition.legs[#st.edition.legs]
+    local firstPts, lastPts = legPoints(st.edition.legs[1]), legPoints(lastLeg)
+    local n = #lastPts
+    local stall = days.endStall(firstPts[1], lastPts[n], lastPts[math.max(1, n - 3)])
+    local lat, lon, h = sLat, sLon, sH
+    local de = { separate = stall ~= nil, mission = mission, at = 'start', startLL = { lat, lon, h },
+      returnMissionId = 'beamng_earth/' .. missionType(lastLeg) .. '/' .. missionName(st.edition, lastLeg) }
+    if stall then de.lat, de.lon, de.h = stall[1], stall[2], stall[3] else de.lat, de.lon, de.h = lat, lon, h end
+    st.dayEnd, st.stallAt = de, nil
+    ownLog('I', string.format('%s ends %s (%.5f, %.5f)', st.edition.label or st.edition.edition,
+      stall and 'at its own end stall' or 'where it began', de.lat, de.lon))
   end
   st.phase = 'running'
   ownLog('I', string.format('starting %s (%d legs, anchor %.5f, %.5f)', id, #st.edition.legs, st.anchor.lat, st.anchor.lon))
@@ -1706,7 +1873,8 @@ local function startPreload()
   local reqs = {}
   for _, leg in ipairs(st.edition.legs) do
     if leg.type == 'special' then
-      local pts = legPoints(leg)
+      -- (a stage of hundreds of kilometres: the first preload.MAX_M of it; the rest is streamed as the car comes to it)
+      local pts = preload.slice(legPoints(leg), preload.MAX_M)
       reqs[#reqs + 1] = { name = leg.id, lat0 = pts[1][1], lon0 = pts[1][2], lat1 = pts[#pts][1], lon1 = pts[#pts][2], line = pts }
     end
   end
@@ -1775,21 +1943,140 @@ local function cancelPreloadGate(why)
 end
 M.cancelPreloadGate = cancelPreloadGate
 
--- Teleport to the edition's service park (Earth picks the anchor) and, unless noLaunch, start the loop there.
-function M.start(editionId, noLaunch)
+-- Teleport to the edition's service park (Earth picks the anchor) and, unless noLaunch, start the loop there. `at` ({ lat, lon,
+-- name }): teleport there instead (the ferry's landing: the next day's service park, found by crossFerry from the leg's own data).
+function M.start(editionId, noLaunch, at)
   if not ensureTaps() then return ownLog('E', 'BeamNG.Earth is not loaded (or has changed): taps missing') end
   local ok, err = ensureEdition(editionId or DEFAULT_EDITION)
   if not ok then return ownLog('E', err) end
   local edition = st.edition
   local lat, lon = servicePark()
-  ownLog('I', string.format('teleporting to %s (%.5f, %.5f)', edition.title or edition.edition, lat, lon))
+  local name = 'Dakar: ' .. (edition.title or edition.edition)
+  if at then lat, lon, name = at.lat, at.lon, at.name or name end
+  ownLog('I', string.format('teleporting to %s (%.5f, %.5f)', at and at.name or edition.title or edition.edition, lat, lon))
   st.phase, st.noLaunch = 'teleporting', noLaunch and true or false
-  local took, why = earthapi.teleport(lat, lon, 'Dakar: ' .. (edition.title or edition.edition))
+  local took, why = earthapi.teleport(lat, lon, name)
   if not took then
     st.phase = 'idle'
     return tell('Dakar: Earth would not teleport: ' .. tostring(why))
   end
   clearStartGps()
+end
+
+-- ---------------------------------------------------------------------------------------------------------------------
+-- Days (days.lua): where a day ends, the ferry between days, the rest day
+
+local DAY_END_RADIUS_M = 250       -- a loop that stopped with the car this close to where its day ends was finished (a stall is a park)
+local STALL_EVERY_S = 1.0
+
+-- The service stall is where the game puts the car at the start of the loop and where it wants it at the end (the flowgraph's
+-- `serviceStallPos`, the manager's service-in entry). A day that ends in another place than it began (Stage 4: Bouarfa to
+-- Zagora) has two: the start's until the day's last liaison begins, then the end's, set as the mission's own variable
+-- (changeBase, through addOrSetVariable) and in the manager's schedule and event list, which took the position when the schedule was made.
+-- Both are lat/lon here, put in the frame as it is now, so a day driven across rebases ends in the right place. `which`: 'start' | 'end'.
+local function setStall(which)
+  local de = st.dayEnd
+  if not (de and st.anchor) then return false end
+  local lat, lon, h
+  if which == 'end' then lat, lon, h = de.lat, de.lon, de.h else lat, lon, h = de.startLL[1], de.startLL[2], de.startLL[3] end
+  local x, y, z = st.anchor:geodeticToWorld(lat, lon, h)
+  local gz = groundAt(x, y, z)
+  local pos = { x, y, (gz or (z + (st.bias or 0))) + 0.5 }
+  local mission = de.mission
+  if mission then
+    mission.missionTypeData.serviceStallPos = pos
+    if mission.fgVariables then mission.fgVariables.serviceStallPos = pos end
+    if mission.addOrSetVariable then
+      local ok, err = pcall(mission.addOrSetVariable, mission, 'serviceStallPos', pos)
+      if not ok then ownLog('W', 'the day\'s service stall was not set in the flowgraph: ' .. tostring(err)) end
+    end
+  end
+  local mgr = rawget(_G, 'gameplay_rallyLoop')
+  local rm = mgr and mgr.getManager and mgr.getManager()
+  for _, entry in ipairs(rm and rm.schedule or {}) do
+    if entry.missionType == 'serviceIn' then entry.serviceStallPos = pos end
+  end
+  for _, ev in ipairs(rm and rm.events or {}) do
+    if ev.type == 'service_in' then ev.pos = pos end
+  end
+  de.at = which
+  ownLog('I', string.format('service stall for %s: %s (%.5f, %.5f)', st.edition.label or st.edition.edition, which, lat, lon))
+  return true
+end
+
+-- A day that ends elsewhere: the end stall comes into force when the loop is on the return liaison (or already past it), the start's
+-- again while it is before it (a restart of the loop puts the car back at the start).
+local function dayStallTick()
+  local de = st.dayEnd
+  if not (de and de.separate and scenery.active) or st.clock - (st.stallAt or -10) < STALL_EVERY_S then return end
+  st.stallAt = st.clock
+  local mgr = rawget(_G, 'gameplay_rallyLoop')
+  local rm = mgr and mgr.getManager and mgr.getManager()
+  local cur = rm and rm.getCurrentMissionId and rm:getCurrentMissionId()
+  if not cur then return end
+  local want = (cur == 'serviceIn' or cur == de.returnMissionId) and 'end' or 'start'
+  if de.at ~= want then setStall(want) end
+end
+
+-- The loop is about to stop (the manager is still there): was the day finished? Not abandoned, at its end and past its last liaison.
+-- The player's "Continue" on the end screen stops the mission this way; leaving the loop anywhere else does not finish the day.
+function M.onAnyMissionWillChange(state, mission, abandoned)
+  if state ~= 'stopped' then return end
+  local ours = type(mission) == 'table' and mission.missionTypeData and mission.missionTypeData.dakarEdition
+  if not ours then return end
+  st.dayStop = nil
+  local de = st.dayEnd
+  if not (de and st.anchor and st.edition and st.edition.edition == ours) then return end
+  local mgr = rawget(_G, 'gameplay_rallyLoop')
+  local rm = mgr and mgr.getManager and mgr.getManager()
+  local cur = rm and rm.getCurrentMissionId and rm:getCurrentMissionId()
+  local car = playerPos()
+  local x, y = st.anchor:geodeticToWorld(de.lat, de.lon, de.h)
+  local near = car and math.sqrt((car[1] - x) ^ 2 + (car[2] - y) ^ 2) <= DAY_END_RADIUS_M
+  local past = cur == nil or cur == 'serviceIn'
+  st.dayStop = { edition = ours, finished = (not abandoned) and near and past or false }
+  ownLog('I', string.format('%s stops: %s (car %s its end, loop at %s)', tostring(ours),
+    st.dayStop.finished and 'the day is finished' or 'the day is not finished', near and 'at' or 'away from', tostring(cur)))
+end
+
+-- A day is finished: what comes next. A ferry ends the day (crossFerry); else the next day starts where this one ended, a rest day
+-- on the way is told about, and the window points at the next day.
+function M.completeDay(ed)
+  ed = ed or st.edition
+  if not ed then return false end
+  st.completed = st.completed or {}
+  st.completed[ed.edition] = true
+  local nxt, rests = dayAfter(ed)
+  local text = (ed.label or ed.title or ed.edition) .. ' is finished.'
+  if ed.ferry then return M.crossFerry(ed, nxt, text) end
+  if not nxt then tell(text .. ' That was the last day of the route.'); return true end
+  local rest = rests and rests[1]
+  ensureEdition(nxt.edition)
+  tell(string.format('%s %sNext: %s starts here%s.', text, rest and string.format('%s (%s): no driving. ', rest.label, rest.date or '') or '',
+    nxt.label or nxt.title, nxt.bivouac and (', at ' .. nxt.bivouac) or ''))
+  return true
+end
+
+-- The ferry that ends a day: no driving, the car is taken from the departure port to the landing and the next day's loop starts from
+-- there. The teleport is the one a loop's start makes (Earth picks the anchor; the commit then settles the world and the next day is
+-- the window's edition), noLaunch: the player starts the next day from the mission list. `nxt`: the next day's view (dayAfter).
+function M.crossFerry(ed, nxt, prefix)
+  ed = ed or st.edition
+  nxt = nxt or dayAfter(ed)
+  local f = ed and ed.ferry
+  if not (f and f.to and f.to.lat and f.to.lon and nxt) then
+    tell('Dakar: there is no ferry to take after ' .. tostring(ed and (ed.label or ed.edition)) .. '.')
+    return false
+  end
+  local where = f.to.name or 'the port'
+  tell(string.format('%sOvernight ferry from %s to %s%s: the car is taken across.', prefix and (prefix .. ' ') or 'Dakar: ',
+    f.from and f.from.name or 'the departure port', where, f.crossing and (' (' .. f.crossing .. ')') or ''))
+  st.ferryLanding = nxt
+  st.completed = st.completed or {}
+  st.completed[f.id or 'ferry'] = true
+  M.start(nxt.edition, true, { lat = f.to.lat, lon = f.to.lon, name = 'Dakar: ferry to ' .. where })
+  if st.phase ~= 'teleporting' then st.ferryLanding = nil; return false end
+  return true
 end
 
 -- A mission's start moved. The game copies startTrigger.pos into its locations cache the first time it reads a mission
@@ -1850,14 +2137,13 @@ placeTrigger = function()
     local c = loadCached(id)
     local mission = c and gameplay_missions_missions.getMissionById(loopMissionId(c.edition))
     if mission and mission.startTrigger then
-      local lat, lon, h = servicePark(c.edition, c.geometry)
+      local lat, lon, h = servicePark(c.edition, c.geometry, c.index or false)
       placeOnGround(mission, st.anchor:geodeticToWorld(lat, lon, h))
     end
     -- every leg's own mission (a liaison or a special stage) has its marker on the time control that opens it, the leg's
     -- first point (TC0 for the first liaison, TC1 for SS1, ...); their info.json says 0, 0, 0, the world's origin
     for _, leg in ipairs(c and c.edition.legs or {}) do
-      local g = c.geometry[leg.id]
-      local p = g and g.points and g.points[1]
+      local p = legStart(c, leg)
       local lm = p and gameplay_missions_missions.getMissionById('beamng_earth/' .. missionType(leg) .. '/' .. missionName(c.edition, leg))
       if lm and lm.startTrigger then
         placeOnGround(lm, st.anchor:geodeticToWorld(p[1], p[2], p[3]))
@@ -1927,6 +2213,8 @@ function M.onUpdate(dt)
     if not okT and not st.missionsWarned then st.missionsWarned = true; ownLog('E', 'mission markers failed: ' .. tostring(errT)) end
     if scenery.active or st.phase == 'running' then pcall(claimGroundMarkers, 'while the loop runs') end
   end
+  local okD, errD = pcall(dayStallTick)
+  if not okD and not st.dayWarned then st.dayWarned = true; ownLog('E', 'day end stall failed: ' .. tostring(errD)) end
   local okU, errU = pcall(guideTick)
   if not okU then
     st.guide = nil

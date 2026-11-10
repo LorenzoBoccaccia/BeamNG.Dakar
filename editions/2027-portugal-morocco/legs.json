@@ -1,26 +1,1262 @@
 {
-  "edition": "2027-portugal-morocco",
-  "status": "route per ASO statement of 2026-10-30; stage-level detail from one secondary source, to cross-check against dakar.com's updated route page and ASO's route PDF",
-  "dates": ["2027-01-09", "2027-01-23"],
-  "totals": { "km": 7824, "specialKm": 4341 },
-  "note": "Leg types: special = timed stage (BeamNG rallyStage), transfer = timed liaison (rallyRoadSection), ferry = teleport leg (no driving; the player is moved to the far port), rest = no event. Coordinates are lat/lon, filled in as the legs are authored.",
-  "legs": [
-    { "id": "P",   "date": "2027-01-09", "type": "special",  "where": "Loule/Faro loop (Algarve Stadium)",       "specialKm": 29,  "totalKm": 129 },
-    { "id": "S1",  "date": "2027-01-10", "type": "special",  "where": "Loule/Faro",                              "specialKm": 100, "totalKm": 300 },
-    { "id": "T1",  "date": "2027-01-10", "type": "transfer", "where": "Algarve -> southern Spain -> Mediterranean port" },
-    { "id": "F1",  "date": "2027-01-10", "type": "ferry",    "where": "Mediterranean port (Spain) -> Nador (Morocco), overnight" },
-    { "id": "T2",  "date": "2027-01-11", "type": "transfer", "where": "Nador -> Bouarfa bivouac",                "totalKm": 590 },
-    { "id": "S2",  "date": "2027-01-12", "type": "special",  "where": "Bouarfa loop (Rekkam plateau)",           "specialKm": 390, "totalKm": 490 },
-    { "id": "S3",  "date": "2027-01-13", "type": "special",  "where": "Bouarfa loop",                            "specialKm": 410, "totalKm": 490 },
-    { "id": "S4",  "date": "2027-01-14", "type": "special",  "where": "Bouarfa -> Zagora (via Merzouga)",        "specialKm": 490, "totalKm": 750 },
-    { "id": "S5",  "date": "2027-01-15", "type": "special",  "where": "Zagora loop (Erg Chegaga)",               "specialKm": 365, "totalKm": 540 },
-    { "id": "S6",  "date": "2027-01-16", "type": "special",  "where": "Zagora -> Agadir (Erg Chegaga)",          "specialKm": 365, "totalKm": 760 },
-    { "id": "R",   "date": "2027-01-17", "type": "rest",     "where": "Agadir" },
-    { "id": "S7",  "date": "2027-01-18", "type": "special",  "where": "Agadir -> Smara",                         "specialKm": 500, "totalKm": 790 },
-    { "id": "S8",  "date": "2027-01-19", "type": "special",  "where": "Smara -> marathon refuge (Dakhla lagoon)", "specialKm": 355, "totalKm": 525 },
-    { "id": "S9",  "date": "2027-01-20", "type": "special",  "where": "marathon refuge -> Smara",                "specialKm": 390, "totalKm": 625 },
-    { "id": "S10", "date": "2027-01-21", "type": "special",  "where": "Smara loop",                              "specialKm": 470, "totalKm": 560 },
-    { "id": "S11", "date": "2027-01-22", "type": "special",  "where": "Smara -> Marrakech (incl. Plage Blanche)", "specialKm": 455, "totalKm": 1035 },
-    { "id": "S12", "date": "2027-01-23", "type": "special",  "where": "Marrakech loop (finish)",                 "specialKm": 22,  "totalKm": 240 }
-  ]
+ "edition": "2027-portugal-morocco",
+ "title": "Dakar 2027: Portugal - Morocco",
+ "missionPrefix": "dakar-2027",
+ "status": "Route as published by ASO on 2026-10-30 (press release as reported by RACER, 2026-10-30): start Jan 9 at the Algarve Stadium (Loule-Faro), prologue then stage 1, transfer to a Mediterranean port and an overnight crossing to Nador, landing Jan 11, first Moroccan bivouac Bouarfa, then south along the Atlas via Zagora to Agadir (rest day), the far south (Smara, almost to Dakhla), back north to the finish in Marrakech on Jan 23; 4,341 km of specials. Stage-by-stage detail (specials, totals, bivouacs, the refuge) is from one secondary write-up of that route (video of 2026-10-31); dakar.com's route page, when read for this, still showed another event's table, so nothing is taken from it. Everything below the day level (the roads and tracks each stage follows) is NOT published yet: it is authored here, see 'note' and each leg's own note.",
+ "dates": [
+  "2027-01-09",
+  "2027-01-23"
+ ],
+ "totals": {
+  "km": 7824,
+  "specialKm": 4341
+ },
+ "sources": [
+  "https://racer.com/2026/10/30/dakar-rally-set-for-portugal-to-morocco-route-in-2027 (ASO's announcement of 2026-10-30: dates, Algarve Stadium, overnight crossing to Nador, Bouarfa, Zagora, Agadir rest day, Smara, almost Dakhla, 4,341 km of specials, 350-500 km stages)",
+  "https://www.youtube.com/watch?v=pMfhg0aBft4 (Dakar 2027 route explained, 2026-10-31: the stage-by-stage table of this file, 29 km prologue in a cork forest, the refuge, the 1,035 km day, 'the port and the ships are not named yet')"
+ ],
+ "unconfirmed": [
+  "The Spanish port. ASO has named none; Almeria (Almeria-Nador, the shortest sea crossing from the Spanish coast nearest the Algarve road that has a regular ferry line) is the working assumption. Beni Ensar (Nador) is the landing: it is the port of Nador.",
+  "Each stage's real itinerary and every liaison: only the start and finish towns are published. The stages here follow plausible pistes and roads between those towns, lengths tuned to the published special km.",
+  "The official total km of a day includes liaisons ASO has not described; the liaisons here take the road between the bivouacs and the stage start and finish, so a day's total is not the official one (see each leg's 'officialKm' and the table in the docs).",
+  "The 590 km of the stage-1 day is read as the transfer to the port (Loule-Almeria is 605 km by road); the 300 km 'total' of stage 1 as its own liaisons plus the special.",
+  "T2 (Nador - Bouarfa) has no official km; the road is about 413 km.",
+  "The marathon refuge's place near the Dakhla lagoon (stage 8 ends there, stage 9 starts there)."
+ ],
+ "note": "Leg types: special = timed stage (BeamNG rallyStage), transfer = timed liaison (rallyRoadSection), ferry = teleport leg (no driving: core.lua crossFerry takes the player from the departure port to the landing, the next day's loop starts there), rest = no event. Each day (see 'days') is a loop of its own in the mission list: its liaison to the start, the special, and the liaison on to the next bivouac, the day starting where the day before ended. Leg 'router': osrm = along roads (OSRM), piste = along Overture's tracks, straight lines where it has none (tools/roadnet.py; the leg's geometry file says how many metres are off the network), straight = the via points as they are. specialKm is the published length of a special; the built one is in the geometry file (tools/fetch_route.py --plan lists both).",
+ "days": [
+  {
+   "id": "d01",
+   "label": "Prologue",
+   "title": "Prologue: the Algarve Stadium and the cork forest",
+   "date": "2027-01-09",
+   "bivouac": "Loule / Faro (Algarve Stadium)",
+   "legs": [
+    "P-in",
+    "P",
+    "P-out"
+   ]
+  },
+  {
+   "id": "d02",
+   "label": "Stage 1",
+   "title": "Stage 1: Loule/Faro, then to the port",
+   "date": "2027-01-10",
+   "bivouac": "Loule / Faro (Algarve Stadium)",
+   "legs": [
+    "S1-in",
+    "S1",
+    "T1",
+    "F1"
+   ],
+   "ferry": "F1"
+  },
+  {
+   "id": "d03",
+   "label": "Transfer",
+   "title": "Transfer: Nador to the Bouarfa bivouac",
+   "date": "2027-01-11",
+   "bivouac": "Nador (Beni Ensar) -> Bouarfa",
+   "legs": [
+    "T2"
+   ]
+  },
+  {
+   "id": "d04",
+   "label": "Stage 2",
+   "title": "Stage 2: Bouarfa loop, Rekkam plateau",
+   "date": "2027-01-12",
+   "bivouac": "Bouarfa",
+   "legs": [
+    "S2-in",
+    "S2",
+    "S2-out"
+   ]
+  },
+  {
+   "id": "d05",
+   "label": "Stage 3",
+   "title": "Stage 3: Bouarfa loop",
+   "date": "2027-01-13",
+   "bivouac": "Bouarfa",
+   "legs": [
+    "S3-in",
+    "S3",
+    "S3-out"
+   ]
+  },
+  {
+   "id": "d06",
+   "label": "Stage 4",
+   "title": "Stage 4: Bouarfa to Zagora via Merzouga",
+   "date": "2027-01-14",
+   "bivouac": "Bouarfa -> Zagora",
+   "legs": [
+    "S4-in",
+    "S4",
+    "S4-out"
+   ]
+  },
+  {
+   "id": "d07",
+   "label": "Stage 5",
+   "title": "Stage 5: Zagora loop, Erg Chegaga",
+   "date": "2027-01-15",
+   "bivouac": "Zagora",
+   "legs": [
+    "S5-in",
+    "S5",
+    "S5-out"
+   ]
+  },
+  {
+   "id": "d08",
+   "label": "Stage 6",
+   "title": "Stage 6: Zagora to Agadir",
+   "date": "2027-01-16",
+   "bivouac": "Zagora -> Agadir",
+   "legs": [
+    "S6-in",
+    "S6",
+    "S6-out"
+   ]
+  },
+  {
+   "id": "d09",
+   "kind": "rest",
+   "label": "Rest day",
+   "title": "Rest day in Agadir",
+   "date": "2027-01-17",
+   "bivouac": "Agadir",
+   "legs": [
+    "R"
+   ]
+  },
+  {
+   "id": "d10",
+   "label": "Stage 7",
+   "title": "Stage 7: Agadir to Smara",
+   "date": "2027-01-18",
+   "bivouac": "Agadir -> Smara",
+   "legs": [
+    "S7-in",
+    "S7",
+    "S7-out"
+   ]
+  },
+  {
+   "id": "d11",
+   "label": "Stage 8",
+   "title": "Stage 8: Smara to the marathon refuge",
+   "date": "2027-01-19",
+   "bivouac": "Smara -> marathon refuge (Dakhla lagoon)",
+   "legs": [
+    "S8-in",
+    "S8",
+    "S8-out"
+   ]
+  },
+  {
+   "id": "d12",
+   "label": "Stage 9",
+   "title": "Stage 9: marathon refuge to Smara",
+   "date": "2027-01-20",
+   "bivouac": "marathon refuge -> Smara",
+   "legs": [
+    "S9-in",
+    "S9",
+    "S9-out"
+   ]
+  },
+  {
+   "id": "d13",
+   "label": "Stage 10",
+   "title": "Stage 10: Smara loop",
+   "date": "2027-01-21",
+   "bivouac": "Smara",
+   "legs": [
+    "S10-in",
+    "S10",
+    "S10-out"
+   ]
+  },
+  {
+   "id": "d14",
+   "label": "Stage 11",
+   "title": "Stage 11: Smara to Marrakech, Plage Blanche",
+   "date": "2027-01-22",
+   "bivouac": "Smara -> Marrakech",
+   "legs": [
+    "S11-in",
+    "S11",
+    "S11-out"
+   ]
+  },
+  {
+   "id": "d15",
+   "label": "Stage 12",
+   "title": "Stage 12: Marrakech loop, the finish",
+   "date": "2027-01-23",
+   "bivouac": "Marrakech",
+   "legs": [
+    "S12-in",
+    "S12",
+    "S12-out"
+   ]
+  }
+ ],
+ "legs": [
+  {
+   "id": "P-in",
+   "type": "transfer",
+   "title": "Algarve Stadium to the prologue",
+   "via": [
+    [
+     37.08847,
+     -7.97571
+    ],
+    [
+     37.153001,
+     -7.887014
+    ]
+   ],
+   "router": "osrm",
+   "parkingNear": 1500,
+   "speedLimitKph": 80
+  },
+  {
+   "id": "P",
+   "type": "special",
+   "title": "Prologue, cork forest",
+   "via": [
+    [
+     37.153001,
+     -7.887014
+    ],
+    [
+     37.229406,
+     -8.090071
+    ]
+   ],
+   "date": "2027-01-09",
+   "where": "Loule/Faro loop (Algarve Stadium)",
+   "specialKm": 29,
+   "totalKm": 129,
+   "router": "osrm",
+   "officialLiaisonKm": 100,
+   "note": "Authored: a 29 km stretch of the cork-oak hills north of Loule (the roads between Sao Bras de Alportel and Salir); ASO says only 'a prologue in a cork forest'. The liaisons are short (19 and 26 km) against the 100 km of the official total of 129 km; the prologue ends heading away from Loule, so the liaison back turns round at the finish."
+  },
+  {
+   "id": "P-out",
+   "type": "transfer",
+   "title": "Prologue finish to the Algarve Stadium",
+   "via": [
+    [
+     37.229406,
+     -8.090071
+    ],
+    [
+     37.139,
+     -8.022
+    ],
+    [
+     37.088471,
+     -7.975711
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 80
+  },
+  {
+   "id": "S1-in",
+   "type": "transfer",
+   "title": "Algarve Stadium to stage 1",
+   "via": [
+    [
+     37.088471,
+     -7.975711
+    ],
+    [
+     37.233482,
+     -8.173945
+    ]
+   ],
+   "router": "osrm",
+   "parkingNear": 1500,
+   "speedLimitKph": 80
+  },
+  {
+   "id": "S1",
+   "type": "special",
+   "title": "Stage 1, Loule/Faro",
+   "via": [
+    [
+     37.233482,
+     -8.173945
+    ],
+    [
+     37.287,
+     -7.813
+    ],
+    [
+     37.47,
+     -7.475046
+    ]
+   ],
+   "date": "2027-01-10",
+   "where": "Loule/Faro",
+   "specialKm": 100,
+   "totalKm": 300,
+   "router": "osrm",
+   "officialLiaisonKm": 200,
+   "note": "Authored: the Caldeirao hills and the Guadiana valley between Alte and Alcoutim (100 km, as published); ASO says only 'Loule/Faro'. The 300 km 'total' is not matched: the liaison to the port (T1) starts at the stage's finish."
+  },
+  {
+   "id": "T1",
+   "type": "transfer",
+   "title": "Algarve to the port of Almeria",
+   "via": [
+    [
+     37.47,
+     -7.475046
+    ],
+    [
+     36.831501,
+     -2.466251
+    ]
+   ],
+   "date": "2027-01-10",
+   "where": "Algarve -> southern Spain -> Mediterranean port",
+   "officialKm": 590,
+   "router": "osrm",
+   "speedLimitKph": 100,
+   "note": "The published 590 km is read as this transfer, from the end of stage 1 near Alcoutim to the port of Almeria (built 582 km by road); Loule - Almeria itself is 605 km. The port is assumed: ASO has not named it."
+  },
+  {
+   "id": "F1",
+   "type": "ferry",
+   "title": "Almeria to Nador, overnight",
+   "date": "2027-01-10",
+   "from": {
+    "name": "Almeria (assumed port)",
+    "lat": 36.8315,
+    "lon": -2.46625
+   },
+   "to": {
+    "name": "Nador (Beni Ensar)",
+    "lat": 35.26564,
+    "lon": -2.93023
+   },
+   "crossing": "overnight, boarding on the night of Jan 10, landing on Jan 11 (ASO: the crossing is overnight; the port of embarkation is not named)",
+   "note": "No driving: the loop of the day ends at the port; the next day's loop (T2) starts at Beni Ensar."
+  },
+  {
+   "id": "T2",
+   "type": "transfer",
+   "title": "Nador to Bouarfa",
+   "via": [
+    [
+     35.26564,
+     -2.93023
+    ],
+    [
+     32.529813,
+     -1.969921
+    ]
+   ],
+   "date": "2027-01-11",
+   "where": "Nador -> Bouarfa bivouac",
+   "officialKm": null,
+   "router": "osrm",
+   "speedLimitKph": 100,
+   "note": "No official km. Nador (Beni Ensar port) to Bouarfa by road, built 414 km."
+  },
+  {
+   "id": "S2-in",
+   "type": "transfer",
+   "title": "Bouarfa to stage 2",
+   "via": [
+    [
+     32.529813,
+     -1.969921
+    ],
+    [
+     33.01067,
+     -2.01095
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S2",
+   "type": "special",
+   "title": "Stage 2, Rekkam plateau",
+   "via": [
+    [
+     33.01067,
+     -2.01095
+    ],
+    [
+     33.01002,
+     -2.0063
+    ],
+    [
+     33.303,
+     -2.3756
+    ],
+    [
+     33.6311,
+     -2.7403
+    ],
+    [
+     33.2665,
+     -3.2509
+    ],
+    [
+     32.9747,
+     -3.4333
+    ],
+    [
+     32.6829,
+     -3.0321
+    ],
+    [
+     32.5005,
+     -2.3391
+    ],
+    [
+     32.80637,
+     -2.06901
+    ],
+    [
+     32.80233,
+     -2.069197
+    ]
+   ],
+   "date": "2027-01-12",
+   "where": "Bouarfa loop (Rekkam plateau)",
+   "specialKm": 390,
+   "totalKm": 490,
+   "router": "piste",
+   "officialLiaisonKm": 100,
+   "note": "Authored: ASO has published only the start and finish towns of this stage and its km. The route follows the tracks Overture Maps has, and straight lines across the dunes and the hamada where it has none (offNetworkM in its geometry file) between waypoints chosen near them and is tuned to the published special km; the liaisons are the roads between the bivouacs and the stage ends, so the day's total km is not the official one (official liaison km of the day: 100)."
+  },
+  {
+   "id": "S2-out",
+   "type": "transfer",
+   "title": "Stage 2 finish to Bouarfa",
+   "via": [
+    [
+     32.80233,
+     -2.069197
+    ],
+    [
+     32.529813,
+     -1.969921
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S3-in",
+   "type": "transfer",
+   "title": "Bouarfa to stage 3",
+   "via": [
+    [
+     32.529813,
+     -1.969921
+    ],
+    [
+     32.492719,
+     -1.84383
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S3",
+   "type": "special",
+   "title": "Stage 3, Bouarfa loop",
+   "via": [
+    [
+     32.492719,
+     -1.84383
+    ],
+    [
+     32.4922,
+     -1.83907
+    ],
+    [
+     32.2821,
+     -1.1375
+    ],
+    [
+     31.7805,
+     -1.3883
+    ],
+    [
+     31.5297,
+     -2.2661
+    ],
+    [
+     31.9059,
+     -3.0185
+    ],
+    [
+     32.2821,
+     -2.5169
+    ],
+    [
+     32.25027,
+     -2.03226
+    ],
+    [
+     32.247867,
+     -2.03572
+    ]
+   ],
+   "date": "2027-01-13",
+   "where": "Bouarfa loop",
+   "specialKm": 410,
+   "totalKm": 490,
+   "router": "piste",
+   "officialLiaisonKm": 80,
+   "note": "Authored: ASO has published only the start and finish towns of this stage and its km. The route follows the tracks Overture Maps has, and straight lines across the dunes and the hamada where it has none (offNetworkM in its geometry file) between waypoints chosen near them and is tuned to the published special km; the liaisons are the roads between the bivouacs and the stage ends, so the day's total km is not the official one (official liaison km of the day: 80)."
+  },
+  {
+   "id": "S3-out",
+   "type": "transfer",
+   "title": "Stage 3 finish to Bouarfa",
+   "via": [
+    [
+     32.247867,
+     -2.03572
+    ],
+    [
+     32.529813,
+     -1.969921
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S4-in",
+   "type": "transfer",
+   "title": "Bouarfa to stage 4",
+   "via": [
+    [
+     32.529813,
+     -1.969921
+    ],
+    [
+     31.931131,
+     -3.592285
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S4",
+   "type": "special",
+   "title": "Stage 4, Merzouga",
+   "via": [
+    [
+     31.931131,
+     -3.592285
+    ],
+    [
+     31.92773,
+     -3.59422
+    ],
+    [
+     31.4871,
+     -3.535
+    ],
+    [
+     31.0396,
+     -3.8035
+    ],
+    [
+     30.8094,
+     -3.7651
+    ],
+    [
+     30.4003,
+     -4.1743
+    ],
+    [
+     30.5921,
+     -5.0693
+    ],
+    [
+     31.1035,
+     -5.3251
+    ],
+    [
+     30.70631,
+     -5.90952
+    ],
+    [
+     30.70246,
+     -5.91011
+    ]
+   ],
+   "date": "2027-01-14",
+   "where": "Bouarfa -> Zagora (via Merzouga)",
+   "specialKm": 490,
+   "totalKm": 750,
+   "router": "piste",
+   "officialLiaisonKm": 260,
+   "note": "Authored: ASO has published only the start and finish towns of this stage and its km. The route follows the tracks Overture Maps has, and straight lines across the dunes and the hamada where it has none (offNetworkM in its geometry file) between waypoints chosen near them and is tuned to the published special km; the liaisons are the roads between the bivouacs and the stage ends, so the day's total km is not the official one (official liaison km of the day: 260)."
+  },
+  {
+   "id": "S4-out",
+   "type": "transfer",
+   "title": "Stage 4 finish to Zagora",
+   "via": [
+    [
+     30.70246,
+     -5.91011
+    ],
+    [
+     30.329152,
+     -5.84018
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S5-in",
+   "type": "transfer",
+   "title": "Zagora to stage 5",
+   "via": [
+    [
+     30.329152,
+     -5.84018
+    ],
+    [
+     29.81997,
+     -5.72134
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S5",
+   "type": "special",
+   "title": "Stage 5, Erg Chegaga",
+   "via": [
+    [
+     29.81997,
+     -5.72134
+    ],
+    [
+     29.81671,
+     -5.72229
+    ],
+    [
+     29.849,
+     -6.2855
+    ],
+    [
+     30.083,
+     -6.8413
+    ],
+    [
+     29.6052,
+     -6.4805
+    ],
+    [
+     29.3127,
+     -6.0905
+    ],
+    [
+     29.4102,
+     -5.6029
+    ],
+    [
+     29.79975,
+     -5.70952
+    ],
+    [
+     29.800445,
+     -5.713825
+    ]
+   ],
+   "date": "2027-01-15",
+   "where": "Zagora loop (Erg Chegaga)",
+   "specialKm": 365,
+   "totalKm": 540,
+   "router": "piste",
+   "officialLiaisonKm": 175,
+   "note": "Authored: ASO has published only the start and finish towns of this stage and its km. The route follows the tracks Overture Maps has, and straight lines across the dunes and the hamada where it has none (offNetworkM in its geometry file) between waypoints chosen near them and is tuned to the published special km; the liaisons are the roads between the bivouacs and the stage ends, so the day's total km is not the official one (official liaison km of the day: 175)."
+  },
+  {
+   "id": "S5-out",
+   "type": "transfer",
+   "title": "Stage 5 finish to Zagora",
+   "via": [
+    [
+     29.800445,
+     -5.713825
+    ],
+    [
+     30.329152,
+     -5.84018
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S6-in",
+   "type": "transfer",
+   "title": "Zagora to stage 6",
+   "via": [
+    [
+     30.329152,
+     -5.84018
+    ],
+    [
+     30.088929,
+     -6.872742
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S6",
+   "type": "special",
+   "title": "Stage 6, Anti-Atlas",
+   "via": [
+    [
+     30.088929,
+     -6.872742
+    ],
+    [
+     30.08977,
+     -6.87119
+    ],
+    [
+     29.9017,
+     -8.0186
+    ],
+    [
+     29.8499,
+     -8.2057
+    ],
+    [
+     29.7492,
+     -8.2863
+    ],
+    [
+     29.8384,
+     -8.5021
+    ],
+    [
+     29.7035,
+     -9.73046
+    ],
+    [
+     29.699761,
+     -9.729143
+    ]
+   ],
+   "date": "2027-01-16",
+   "where": "Zagora -> Agadir (Erg Chegaga)",
+   "specialKm": 365,
+   "totalKm": 760,
+   "router": "piste",
+   "officialLiaisonKm": 395,
+   "note": "Authored: ASO has published only the start and finish towns of this stage and its km. The route follows the tracks Overture Maps has, and straight lines across the dunes and the hamada where it has none (offNetworkM in its geometry file) between waypoints chosen near them and is tuned to the published special km; the liaisons are the roads between the bivouacs and the stage ends, so the day's total km is not the official one (official liaison km of the day: 395)."
+  },
+  {
+   "id": "S6-out",
+   "type": "transfer",
+   "title": "Stage 6 finish to Agadir",
+   "via": [
+    [
+     29.699761,
+     -9.729143
+    ],
+    [
+     30.410039,
+     -9.550108
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "R",
+   "type": "rest",
+   "title": "Rest day in Agadir",
+   "date": "2027-01-17",
+   "where": "Agadir"
+  },
+  {
+   "id": "S7-in",
+   "type": "transfer",
+   "title": "Agadir to stage 7",
+   "via": [
+    [
+     30.410039,
+     -9.550108
+    ],
+    [
+     28.98996,
+     -10.06003
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S7",
+   "type": "special",
+   "title": "Stage 7, towards Smara",
+   "via": [
+    [
+     28.98996,
+     -10.06003
+    ],
+    [
+     28.98757,
+     -10.0563
+    ],
+    [
+     28.5986,
+     -9.4525
+    ],
+    [
+     28.0286,
+     -9.3149
+    ],
+    [
+     27.3111,
+     -10.5041
+    ],
+    [
+     26.90675,
+     -11.41456
+    ],
+    [
+     26.90342,
+     -11.4162
+    ]
+   ],
+   "date": "2027-01-18",
+   "where": "Agadir -> Smara",
+   "specialKm": 500,
+   "totalKm": 790,
+   "router": "piste",
+   "officialLiaisonKm": 290,
+   "note": "Authored: ASO has published only the start and finish towns of this stage and its km. The route follows the tracks Overture Maps has, and straight lines across the dunes and the hamada where it has none (offNetworkM in its geometry file) between waypoints chosen near them and is tuned to the published special km; the liaisons are the roads between the bivouacs and the stage ends, so the day's total km is not the official one (official liaison km of the day: 290)."
+  },
+  {
+   "id": "S7-out",
+   "type": "transfer",
+   "title": "Stage 7 finish to Smara",
+   "via": [
+    [
+     26.90342,
+     -11.4162
+    ],
+    [
+     26.733604,
+     -11.637717
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S8-in",
+   "type": "transfer",
+   "title": "Smara to stage 8",
+   "via": [
+    [
+     26.733604,
+     -11.637717
+    ],
+    [
+     26.395869,
+     -11.993408
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S8",
+   "type": "special",
+   "title": "Stage 8, towards Dakhla",
+   "via": [
+    [
+     26.395869,
+     -11.993408
+    ],
+    [
+     26.39322,
+     -11.9967
+    ],
+    [
+     25.2207,
+     -12.5285
+    ],
+    [
+     24.9774,
+     -14.63092
+    ],
+    [
+     24.976504,
+     -14.635252
+    ]
+   ],
+   "date": "2027-01-19",
+   "where": "Smara -> marathon refuge (Dakhla lagoon)",
+   "specialKm": 355,
+   "totalKm": 525,
+   "router": "piste",
+   "officialLiaisonKm": 170,
+   "note": "Authored: ASO has published only the start and finish towns of this stage and its km. The route follows the tracks Overture Maps has, and straight lines across the dunes and the hamada where it has none (offNetworkM in its geometry file) between waypoints chosen near them and is tuned to the published special km; the liaisons are the roads between the bivouacs and the stage ends, so the day's total km is not the official one (official liaison km of the day: 170)."
+  },
+  {
+   "id": "S8-out",
+   "type": "transfer",
+   "title": "Stage 8 finish to the refuge",
+   "via": [
+    [
+     24.976504,
+     -14.635252
+    ],
+    [
+     24.418258,
+     -15.091019
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S9-in",
+   "type": "transfer",
+   "title": "Refuge to stage 9",
+   "via": [
+    [
+     24.418258,
+     -15.091019
+    ],
+    [
+     24.524559,
+     -14.811502
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S9",
+   "type": "special",
+   "title": "Stage 9, back to Smara",
+   "via": [
+    [
+     24.524559,
+     -14.811502
+    ],
+    [
+     24.52088,
+     -14.80966
+    ],
+    [
+     24.8521,
+     -13.9277
+    ],
+    [
+     26.1735,
+     -12.21
+    ],
+    [
+     26.39322,
+     -11.9967
+    ],
+    [
+     26.395869,
+     -11.993408
+    ]
+   ],
+   "date": "2027-01-20",
+   "where": "marathon refuge -> Smara",
+   "specialKm": 390,
+   "totalKm": 625,
+   "router": "piste",
+   "officialLiaisonKm": 235,
+   "note": "Authored: ASO has published only the start and finish towns of this stage and its km. The route follows the tracks Overture Maps has, and straight lines across the dunes and the hamada where it has none (offNetworkM in its geometry file) between waypoints chosen near them and is tuned to the published special km; the liaisons are the roads between the bivouacs and the stage ends, so the day's total km is not the official one (official liaison km of the day: 235)."
+  },
+  {
+   "id": "S9-out",
+   "type": "transfer",
+   "title": "Stage 9 finish to Smara",
+   "via": [
+    [
+     26.395869,
+     -11.993408
+    ],
+    [
+     26.733604,
+     -11.637717
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S10-in",
+   "type": "transfer",
+   "title": "Smara to stage 10",
+   "via": [
+    [
+     26.733604,
+     -11.637717
+    ],
+    [
+     26.562786,
+     -11.318414
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S10",
+   "type": "special",
+   "title": "Stage 10, Smara loop",
+   "via": [
+    [
+     26.562786,
+     -11.318414
+    ],
+    [
+     26.56337,
+     -11.31422
+    ],
+    [
+     26.5326,
+     -11.1074
+    ],
+    [
+     27.0775,
+     -10.9517
+    ],
+    [
+     27.3888,
+     -11.5744
+    ],
+    [
+     26.9218,
+     -12.1193
+    ],
+    [
+     26.2991,
+     -12.4306
+    ],
+    [
+     26.1434,
+     -11.8858
+    ],
+    [
+     26.69163,
+     -11.66616
+    ],
+    [
+     26.695539,
+     -11.667332
+    ]
+   ],
+   "date": "2027-01-21",
+   "where": "Smara loop",
+   "specialKm": 470,
+   "totalKm": 560,
+   "router": "piste",
+   "officialLiaisonKm": 90,
+   "note": "Authored: ASO has published only the start and finish towns of this stage and its km. The route follows the tracks Overture Maps has, and straight lines across the dunes and the hamada where it has none (offNetworkM in its geometry file) between waypoints chosen near them and is tuned to the published special km; the liaisons are the roads between the bivouacs and the stage ends, so the day's total km is not the official one (official liaison km of the day: 90)."
+  },
+  {
+   "id": "S10-out",
+   "type": "transfer",
+   "title": "Stage 10 finish to Smara",
+   "via": [
+    [
+     26.695539,
+     -11.667332
+    ],
+    [
+     26.733604,
+     -11.637717
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S11-in",
+   "type": "transfer",
+   "title": "Smara to stage 11",
+   "via": [
+    [
+     26.733604,
+     -11.637717
+    ],
+    [
+     27.217248,
+     -11.890741
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S11",
+   "type": "special",
+   "title": "Stage 11, Plage Blanche",
+   "via": [
+    [
+     27.217248,
+     -11.890741
+    ],
+    [
+     27.2193,
+     -11.89465
+    ],
+    [
+     27.9,
+     -10.5
+    ],
+    [
+     28.4,
+     -11.1
+    ],
+    [
+     28.85,
+     -10.9
+    ],
+    [
+     29.7035,
+     -9.73046
+    ],
+    [
+     29.699761,
+     -9.729143
+    ]
+   ],
+   "date": "2027-01-22",
+   "where": "Smara -> Marrakech (incl. Plage Blanche)",
+   "specialKm": 455,
+   "totalKm": 1035,
+   "router": "piste",
+   "officialLiaisonKm": 580,
+   "note": "Authored: ASO has published only the start and finish towns of this stage and its km. The route follows the tracks Overture Maps has, and straight lines across the dunes and the hamada where it has none (offNetworkM in its geometry file) between waypoints chosen near them and is tuned to the published special km; the liaisons are the roads between the bivouacs and the stage ends, so the day's total km is not the official one (official liaison km of the day: 580)."
+  },
+  {
+   "id": "S11-out",
+   "type": "transfer",
+   "title": "Stage 11 finish to Marrakech",
+   "via": [
+    [
+     29.699761,
+     -9.729143
+    ],
+    [
+     31.63001,
+     -7.980087
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S12-in",
+   "type": "transfer",
+   "title": "Marrakech to stage 12",
+   "via": [
+    [
+     31.63001,
+     -7.980087
+    ],
+    [
+     31.397879,
+     -8.152871
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  },
+  {
+   "id": "S12",
+   "type": "special",
+   "title": "Stage 12, Agafay",
+   "via": [
+    [
+     31.397879,
+     -8.152871
+    ],
+    [
+     31.39976,
+     -8.15672
+    ],
+    [
+     31.40624,
+     -8.15212
+    ],
+    [
+     31.40324,
+     -8.1571
+    ],
+    [
+     31.40024,
+     -8.14912
+    ],
+    [
+     31.45243,
+     -8.09952
+    ],
+    [
+     31.449121,
+     -8.098153
+    ]
+   ],
+   "date": "2027-01-23",
+   "where": "Marrakech loop (finish)",
+   "specialKm": 22,
+   "totalKm": 240,
+   "router": "piste",
+   "officialLiaisonKm": 218,
+   "note": "Authored: a 22 km loop in the Agafay desert south-west of Marrakech (as the finish stage); ASO has not said where. The 240 km total is not matched, the liaisons here are 40 and 28 km."
+  },
+  {
+   "id": "S12-out",
+   "type": "transfer",
+   "title": "Stage 12 finish to Marrakech",
+   "via": [
+    [
+     31.449121,
+     -8.098153
+    ],
+    [
+     31.63001,
+     -7.980087
+    ]
+   ],
+   "router": "osrm",
+   "speedLimitKph": 100
+  }
+ ]
 }

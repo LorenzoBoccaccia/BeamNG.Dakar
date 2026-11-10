@@ -648,6 +648,8 @@ local function groundAt(x, y, hint)
   return nil
 end
 M.groundAt = groundAt
+M.ensureEdition = ensureEdition      -- (the window's pick; the tests')
+M.editionIds = editionIds
 
 local PROP_SNAP_M = 400            -- a prop this close to the player is put on the real ground
 local PROP_SNAP_MIN_M = 0.2          -- (and not touched for less)
@@ -1800,6 +1802,8 @@ local function launch()
   -- the loop's own positions (the service stall, the start trigger) are world numbers in the current frame too; the car is
   -- put there by the mission, half a metre above the ground (the route already lies on it).
   local pl = res.placement
+  -- (the stall where the loop puts the car, kept as lat/lon: a day that ends elsewhere has it set back here, see setStall)
+  local sLat, sLon, sH = st.anchor:worldToGeodetic(pl.pos[1], pl.pos[2], pl.pos[3])
   -- (the car starts in the parking lot with TC0 a few metres ahead of it; without a lot the stall stands back
   -- from TC0: on the game's ground there, else at the height of the data)
   local gzStall = groundAt(pl.pos[1], pl.pos[2], pl.pos[3])
@@ -1823,7 +1827,7 @@ local function launch()
     local firstPts, lastPts = legPoints(st.edition.legs[1]), legPoints(lastLeg)
     local n = #lastPts
     local stall = days.endStall(firstPts[1], lastPts[n], lastPts[math.max(1, n - 3)])
-    local lat, lon, h = servicePark()
+    local lat, lon, h = sLat, sLon, sH
     local de = { separate = stall ~= nil, mission = mission, at = 'start', startLL = { lat, lon, h },
       returnMissionId = 'beamng_earth/' .. missionType(lastLeg) .. '/' .. missionName(st.edition, lastLeg) }
     if stall then de.lat, de.lon, de.h = stall[1], stall[2], stall[3] else de.lat, de.lon, de.h = lat, lon, h end

@@ -26,6 +26,30 @@ M.STRAY_FAR_M = 30
 
 local sqrt, cos, rad = math.sqrt, math.cos, math.rad
 
+M.MAX_M = 40000             -- of a long stage, the first this many metres are asked for (a 490 km stage's whole corridor would be
+                            -- gigabytes, and the router is asked for a route, not a track across the dunes)
+
+-- The first `maxM` metres of a line ({ {lat, lon, h}, ... }): the line itself when it is shorter, else its leading points and a last one
+-- cut on the segment that reaches the limit.
+function M.slice(line, maxM)
+  if not line or #line < 2 then return line end
+  local out, acc = { line[1] }, 0
+  for i = 2, #line do
+    local a, b = line[i - 1], line[i]
+    local dn = (b[1] - a[1]) * 111320
+    local de = (b[2] - a[2]) * 111320 * cos(rad((a[1] + b[1]) / 2))
+    local d = sqrt(dn * dn + de * de)
+    if acc + d >= maxM then
+      local f = d > 1e-9 and (maxM - acc) / d or 0
+      out[#out + 1] = { a[1] + (b[1] - a[1]) * f, a[2] + (b[2] - a[2]) * f, (a[3] or 0) + ((b[3] or 0) - (a[3] or 0)) * f }
+      return out
+    end
+    acc = acc + d
+    out[#out + 1] = b
+  end
+  return out
+end
+
 -- How far a route (Earth's, { {lat, lon}, ... }) strays from the stage line ({ {lat, lon, h}, ... }): the line's points
 -- (every STRAY_STEP_M) against the route's segments, and the route's points against the line.
 -- Returns { lineMax, lineMean, lineFarShare (of the line's points further than STRAY_FAR_M), routeMax, routeKm, lineKm }.

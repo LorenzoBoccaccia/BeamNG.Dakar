@@ -299,7 +299,23 @@ written to its files:
     road itself follows the stage road, a crossing included. Earth's own road grading (below) is not ours to change, and neither is what it
     leaves beside a tunnel: Earth grades every road it draws, a motorway's profile over 40 m, with its own cut and fill slopes, and leaves the ground over a
     covered tunnel (its half width and 5 m) as the elevation data has it. The Popoli stage's 650 to 735 m crosses over the A25's tunnel (the line is
-    within a metre of its axis there; the plain A25 ways are 35 m off and its viaduct 55 m), which is the ground in that stretch;
+    within a metre of its axis there; the plain A25 ways are 35 m off and its viaduct 55 m), which is the ground in that stretch.
+    (The line's points there are still left as Earth made them: what follows is done apart from them, with nothing from the stage's
+    data;)
+  - the ground of a road across a tunnel, laid to the road (`crossing.lua`; it runs whatever the option for the shaping says, because
+    the stage cannot be driven without it): Earth leaves the raw ground over a covered tunnel's strip, which also undoes the grading
+    of a road laid across it, so where the stage road passes over a tunnel the ground rises and falls across the carriageway
+    (on the Popoli stage, at the four crossings of the A25's two bores, 1 to 2 m off at the lane edges and up to 4 m within 9 m of the line)
+    while the road's surface, and the lane lines and walls drawn on it, are level at the road's plan. Nothing in the game has the plan itself (the road
+    mesh is render-only and its file compressed; the navgraph's heights are read off the ground), so it is found at run time in what the game has:
+    the tunnels Earth has built (the points along their axes, `ambience.tunnelLights()`) and the terrain block. A crossing meets a tunnel's
+    axis at 45 degrees or more, passes from one side to the other, and is 30 m or more along the tunnel from either end: a road that
+    runs into a tunnel, along it or past a portal is not one, and the portals, holes and arch raise stay Earth's. The stretch is where the
+    terrain 2 and 4 m to either side of the line stands off the line's height by 0.3 m or more (the graded road is level across, within a few cm), from
+    the first flat sample before it to the first flat sample past it, each 8 m or more from the axis; its height is the line's own ground
+    at those two samples, straight between (within 0.1 m of the plan on the data). The cells within 11.5 m of the line there, inside the
+    strip over the tunnel and 3 m of fade beyond it, are laid to that height with the usual falloff, up to 6 m of change. With the option off the
+    ground goes back to Earth's but for these places (the window says how many); a tunnel's tiles that arrive after the terrain plan the work again;
   - the ground at either end of a deck, met to the deck's top: a bridge OpenStreetMap tags (`structures` in the
     geometry), and a deck of our own road the game's colliders show, tagged or not (the culvert after the Popoli
     underpass). The latter is a run of points under a wide collider (as wide as a road) that stands over the ground, one point

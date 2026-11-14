@@ -17,6 +17,9 @@
 --   * and nothing beside a tunnel: Earth builds a tunnel's tube and portals and shapes the terrain for them (holes at the mouths, the ground
 --     raised over a low arch), so a point of the line near one (the geometry's `tunnelsBeside`, OpenStreetMap's tunnel ways, and the tubes
 --     Earth has made in the game now) is left as Earth made it.
+--   * and, apart from the option for all of the above, the ground of a road across a tunnel (crossing.lua): Earth leaves the raw ground over a covered tunnel
+--     where it grades every other road's, so a stage road that passes over one has the hill's slope through its carriageway. Found at run time (the tunnels
+--     Earth built, the terrain block), that stretch of the ground is laid to the road's height, over the strip of raw ground only. It runs when the option is off too.
 -- Another road's ground is never moved: the geometry's `otherRoads` (OpenStreetMap's other drivable ways near the line, without the stage's own road, bridges and
 -- tunnels) are kept clear of beyond the stage road's own footprint (CORE_M): the weight of the stage's taper falls to 0 at the other road's edge (its half width and
 -- OTHER_MARGIN_M), over OTHER_FADE_M. A motorway beside the road, a road that crosses it or leaves it keep the ground Earth gave them; the ground under the stage road itself,
@@ -60,6 +63,7 @@
 --
 -- Pure apart from the env it is given (block, clock, ground, player, log); the tests give it a stub TerrainBlock.
 local curate = require('beamngDakar/curate')
+local crossing = require('beamngDakar/crossing')
 
 local M = {}
 
@@ -82,6 +86,11 @@ M.TUNNEL_KEEP_M = 30        -- a point of the line this near a tunnel's axis (Ea
                             -- CORE_M + BLEND_M from the line, and the line's points are 10 m apart) is left alone, with its segments
 M.OTHER_MARGIN_M = 2        -- another road's ground is its carriageway and shoulders (the geometry's `otherRoads`: a half width each) and this much more
 M.OTHER_FADE_M = 3          -- (a verge, Earth's wall at a cutting); the stage road's taper eases to nothing over this much before it
+M.TUNNEL_CELL_M = 80        -- a tunnel point within a cell of this many metres of a point of the line is near it (the repair of a crossing over a tunnel, crossing.lua)
+M.TUNNEL_POLL_S = 2         -- (the tunnels Earth has built are looked at this often for a change near the lines)
+M.CROSS_CHANGE_M = 6        -- the ground laid to a road across a tunnel moves this far at most (4.3 m on the Popoli stage; MAX_CHANGE_M is the shaping's)
+M.CROSS_FADE_M = 3          -- the road's ground is laid only where the raw ground over the tunnel is: inside its strip, easing out over this much beyond it
+M.CROSS_STEP_M = 4          -- the stretch's heights are written as segments of this length
 M.TUNNEL_POINT_M = 10       -- (the tubes Earth made in the game are known by points along their axes, 20 m apart at most: this much more for the gap)
 M.TAPER_M = 15              -- a fix ends in a taper along the line: the points within this of a spike are fixed with it (the delta
                             -- falls from the spike to the first point beyond, where it is 0)
@@ -201,8 +210,9 @@ function E:setLines(lines)
     self.lines = lines
     return
   end
-  self.lines, self.linesKey = lines, key
-  self.dirty = self.lines ~= nil
+  self.lines, self.linesKey, self.lineCells = lines, key, nil
+  self.tunNear, self.tunSeen = self:tunnelsNear(), nil
+  self.dirty = self:wanted()
   self.job = nil
   if self.dirty and self.fresh then self:shapeNow() end
 end
@@ -214,7 +224,7 @@ function E:blockChanged(stale)
   self.gen = self.gen + 1
   self.rec = nil
   self.job = nil
-  self.dirty = self.lines ~= nil
+  self.dirty = self:wanted()
   self.fresh = true
   self.noSync = false
   if self.dirty and not stale then self:shapeNow() end
@@ -225,16 +235,50 @@ function E:setEnabled(on)
   if on == self.enabled then return end
   self.enabled = on
   self.job = nil
-  self.dirty = on and self.lines ~= nil
+  -- (switched off, the ground along the road goes back to Earth's, but for a road across a tunnel: that repair is not part of the option, see wanted)
+  self.dirty = self:wanted()
 end
 
 -- The loop is over: the heights go back and the lines are dropped.
 function E:stop()
-  self.lines, self.linesKey, self.dirty, self.job = nil, nil, false, nil
+  self.lines, self.linesKey, self.dirty, self.job, self.lineCells, self.tunNear = nil, nil, false, nil, nil, nil
 end
 
 function E:busy() return self.job ~= nil or self.dirty or (self.rec ~= nil and self.rec.n > 0 and not self:wanted()) end
-function E:wanted() return self.enabled and self.lines ~= nil end
+-- Is there anything to write? The general shaping is the option's (self.enabled); the repair of a road's ground where it crosses over a tunnel (crossing.lua) is not:
+-- the stage cannot be driven without it, so it stays on whenever the stage's lines are set and a tunnel Earth built is near them.
+function E:wanted() return self.lines ~= nil and (self.enabled or (self.tunNear or 0) > 0) end
+
+-- How many of the tunnel points Earth has made (env.tunnels) are near the lines: a change of that number plans the work again (the road tile that has the tunnel comes after the terrain).
+function E:tunnelsNear()
+  return #self:nearTunnelPoints()
+end
+
+-- The tunnel points Earth has made that are near the lines.
+function E:nearTunnelPoints()
+  local list = self.env.tunnels and self.env.tunnels() or nil
+  if not (list and self.lines) then return {} end
+  local cells = self.lineCells
+  if not cells then                                  -- (once for these lines: a long stage has tens of thousands of points)
+    cells = {}
+    for _, line in ipairs(self.lines) do
+      local lastX, lastY
+      for _, p in ipairs(line.pts) do
+        local cx, cy = floor(p[1] / M.TUNNEL_CELL_M), floor(p[2] / M.TUNNEL_CELL_M)
+        if cx ~= lastX or cy ~= lastY then
+          lastX, lastY = cx, cy
+          for dx = -1, 1 do for dy = -1, 1 do cells[(cx + dx) * 131072 + cy + dy] = true end end
+        end
+      end
+    end
+    self.lineCells = cells
+  end
+  local out = {}
+  for _, t in ipairs(list) do
+    if cells[floor(t[1] / M.TUNNEL_CELL_M) * 131072 + floor(t[2] / M.TUNNEL_CELL_M)] then out[#out + 1] = t end
+  end
+  return out
+end
 
 local function log(self, level, msg) if self.env.log then self.env.log(level, msg) end end
 
@@ -575,6 +619,19 @@ local function makeRamp(ground, pts, cum, i, j, pin, step)
   return r
 end
 
+-- The block's height at a world point as it stands now (bilinear between the vertices), or nil.
+local function heightAt(tb, info, off, x, y)
+  local fx, fy = (x - info.px) / info.sq, (y - info.py) / info.sq
+  local gx, gy = floor(fx), floor(fy)
+  local tx, ty = fx - gx, fy - gy
+  if gx < 0 or gy < 0 or gx + 1 >= info.n or gy + 1 >= info.n then return nil end
+  local ok, a, b, c, d = pcall(function()
+    return tb:getHeightGrid(gx, gy), tb:getHeightGrid(gx + 1, gy), tb:getHeightGrid(gx, gy + 1), tb:getHeightGrid(gx + 1, gy + 1)
+  end)
+  if not (ok and type(a) == 'number' and type(b) == 'number' and type(c) == 'number' and type(d) == 'number') then return nil end
+  return off + (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
+end
+
 -- Segments of the lines inside the block, as parallel arrays, the segments within the stretch the player is at
 -- first. Bridges and tunnels (curated spans, a deck) are not in it; the ground under an overpass is. S.stop[k] is 2 for the segments of a ramp
 -- (makeRamp): the cells behind a segment's start, projected on it, are under the deck, or the segment before's, and not its to move.
@@ -585,14 +642,21 @@ local function plan(self, tb, info, off)
   local xmin, xmax = info.px + lo, info.px + info.n * info.sq - lo
   local ymin, ymax = info.py + lo, info.py + info.n * info.sq - lo
   local cx, cy = self.carX, self.carY
-  local S = { ax = {}, ay = {}, az = {}, dx = {}, dy = {}, dz = {}, l2 = {}, near = {}, ln = {}, s = {}, cap = {}, stop = {}, n = 0, cuts = {} }
+  local S = { ax = {}, ay = {}, az = {}, dx = {}, dy = {}, dz = {}, l2 = {}, near = {}, ln = {}, s = {}, cap = {}, stop = {}, n = 0, cuts = {},
+    lv = {}, tx = {} }
   local skipped = { span = 0, ground = 0, deck = 0, over = 0, pinned = 0, tunnel = 0 }
   -- the stretches fixed: how many of each kind, their length along the line, the largest delta, and each one's place (list); what the
   -- colliders over the line were taken for (found: a deck left alone, a narrow one, ...), for the log
-  local fixes = { n = 0, length = 0, largest = 0, list = {}, found = {}, spread = 0, spreadMax = 0, ramps = {}, covered = 0 }
+  local fixes = { n = 0, length = 0, largest = 0, list = {}, found = {}, spread = 0, spreadMax = 0, ramps = {}, covered = 0, crossings = 0 }
   -- the tubes of Earth's tunnels in the game now (points along their axes), for the points of the line beside one
   local tunnelPts = env.tunnels and env.tunnels() or nil
   local keepR2 = (M.TUNNEL_KEEP_M + M.TUNNEL_POINT_M) ^ 2
+  -- the tunnels as lines, for the roads that cross over one
+  local chains = tunnelPts and #tunnelPts > 0 and crossing.chains(self:nearTunnelPoints()) or nil
+  local rawGround = function(x, y)
+    if x < xmin or x > xmax or y < ymin or y > ymax then return nil end
+    return heightAt(tb, info, off, x, y)
+  end
   local rim = M.EDGE_CELLS + 2
   local rayR2 = M.DECK_RAY_M * M.DECK_RAY_M
   -- how far the car is from segment k (squared: the nearest first), which begins at (ax, ay)
@@ -613,7 +677,7 @@ local function plan(self, tb, info, off)
     -- which Earth sinks), and the colliders above it
     local G, top, wide = {}, {}, {}
     for i, p in ipairs(pts) do
-      if p[1] >= xmin - 40 and p[1] <= xmax + 40 and p[2] >= ymin - 40 and p[2] <= ymax + 40 then
+      if self.enabled and p[1] >= xmin - 40 and p[1] <= xmax + 40 and p[2] >= ymin - 40 and p[2] <= ymax + 40 then      -- (the option's shaping only)
         local gx, gy = vertex(info, p[1], p[2])
         if gx >= rim and gy >= rim and gx < info.n - rim and gy < info.n - rim then
           local okH, h = pcall(function() return tb:getHeightGrid(gx, gy) end)
@@ -902,6 +966,43 @@ local function plan(self, tb, info, off)
       end
     end
     for _, r in ipairs(ramps) do fixes.ramps[#fixes.ramps + 1] = r end
+    -- Where the line crosses over a tunnel Earth built, the ground the line is on is raw over the tunnel's strip, not the road's (crossing.lua): it is laid to the road's
+    -- height there: segments with absolute heights (S.lv), over the strip only (S.tx), whatever the option for the general shaping says
+    if chains and #chains > 0 then
+      local found = crossing.find(pts, chains, { ground = rawGround, skip = function(i)
+        return (line.skip and line.skip[i]) or deck[i] or deck[i + 1]
+      end })
+      for _, c in ipairs(found) do
+        local axis = { x = {}, y = {} }
+        for q = 1, #c.chain.x do
+          if (c.chain.x[q] - c.x) ^ 2 + (c.chain.y[q] - c.y) ^ 2 <= 150 ^ 2 then axis.x[#axis.x + 1], axis.y[#axis.y + 1] = c.chain.x[q], c.chain.y[q] end
+        end
+        local tx = { x = axis.x, y = axis.y, r = c.strip }
+        local sm, big, bigAt = c.samples, 0, nil
+        local q = 1
+        while q < #sm do
+          local q2 = min(q + M.CROSS_STEP_M, #sm)
+          local a, b = sm[q], sm[q2]
+          local k = S.n + 1
+          S.n = k
+          S.ax[k], S.ay[k], S.az[k] = a.x, a.y, a.z
+          S.dx[k], S.dy[k], S.dz[k] = b.x - a.x, b.y - a.y, b.z - a.z
+          S.l2[k] = S.dx[k] * S.dx[k] + S.dy[k] * S.dy[k]
+          S.ln[k], S.s[k] = ln, a.s
+          S.cap[k], S.lv[k], S.tx[k] = M.CROSS_CHANGE_M, true, tx
+          nearCar(k, a.x, a.y)
+          local g = rawGround(a.x, a.y)
+          if g and abs(a.z - g) > big then big, bigAt = abs(a.z - g), a end
+          q = q2
+        end
+        fixes.n = fixes.n + 1
+        fixes.crossings = fixes.crossings + 1
+        fixes['tunnel crossing'] = (fixes['tunnel crossing'] or 0) + 1
+        fixes.length = fixes.length + (c.s1 - c.s0)
+        if big > fixes.largest then fixes.largest = big end
+        fixes.list[#fixes.list + 1] = { ln = ln, kind = 'tunnel crossing', s0 = c.s0, s1 = c.s1, x = c.x, y = c.y, d = big, angle = c.angle, arcM = c.arcM, strip = c.strip }
+      end
+    end
   end
   -- the spatial hash: each bucket lists the segments whose reach touches it
   local bs = M.BUCKET_M
@@ -991,7 +1092,25 @@ end
 -- point), w the falloff (the cell keeps its place in the road's cross slope and camber, it moves with the line); nil when
 -- no line reaches it. The second result is the square of the cell's distance to the nearest segment (the road core is within CORE_M
 -- of the line).
-local CK, CD, CZ = {}, {}, {}                 -- (scratch: the segments that reach the cell)
+local CK, CD, CZ, CM = {}, {}, {}, {}         -- (scratch: the segments that reach the cell)
+
+-- A road across a tunnel (crossing.lua) is laid over the strip of raw ground above the tunnel only: 1 within the strip (tx.r from the axis), easing to 0 over CROSS_FADE_M.
+local function stripFactor(tx, x, y)
+  local best = math.huge
+  local xs, ys = tx.x, tx.y
+  for q = 1, #xs - 1 do
+    local ax, ay = xs[q], ys[q]
+    local dx, dy = xs[q + 1] - ax, ys[q + 1] - ay
+    local l2 = dx * dx + dy * dy
+    local t = l2 > 1e-9 and ((x - ax) * dx + (y - ay) * dy) / l2 or 0
+    if t < 0 then t = 0 elseif t > 1 then t = 1 end
+    local ex, ey = x - (ax + dx * t), y - (ay + dy * t)
+    local d2 = ex * ex + ey * ey
+    if d2 < best then best = d2 end
+  end
+  return M.weight(sqrt(best), tx.r, M.CROSS_FADE_M)
+end
+
 local function target(S, buckets, x, y, orig)
   local bs = M.BUCKET_M
   local list = buckets[floor(x / bs) * 131072 + floor(y / bs)]
@@ -999,6 +1118,7 @@ local function target(S, buckets, x, y, orig)
   local core, blend = M.CORE_M, M.BLEND_M
   local reach2 = (core + blend) * (core + blend)
   local ax, ay, dx, dy, l2s, az, dz, stop = S.ax, S.ay, S.dx, S.dy, S.l2, S.az, S.dz, S.stop
+  local lv, tx = S.lv, S.tx
   -- the segments that reach the cell, and the point of each nearest to it
   local m, dmin2, best = 0, math.huge, 0
   for q = 1, #list do
@@ -1014,6 +1134,11 @@ local function target(S, buckets, x, y, orig)
     if d2 < reach2 and not under then
       m = m + 1
       CK[m], CD[m], CZ[m] = k, d2, az[k] + dz[k] * t        -- (the line's delta there)
+      CM[m] = 1
+      if lv[k] then                                          -- (a road across a tunnel: the heights are the road's own, not a delta: the cell goes to the road's height, over the strip)
+        CZ[m] = CZ[m] - orig
+        CM[m] = stripFactor(tx[k], x, y)
+      end
       if d2 < dmin2 then dmin2, best = d2, m end
     end
   end
@@ -1040,6 +1165,7 @@ local function target(S, buckets, x, y, orig)
         if f < 1 then S.kept = (S.kept or 0) + 1; w = w * f end
       end
     end
+    w = w * CM[best]
     if w <= 0 then return nil end
     return orig + CZ[best] * w, dmin2, kb
   end
@@ -1057,7 +1183,7 @@ local function target(S, buckets, x, y, orig)
       end
     end
     if nearest then
-      local w = M.weight(sqrt(da), core, blend)
+      local w = M.weight(sqrt(da), core, blend) * CM[a]
       if w > 0 then
         local w2 = w * w
         w2 = w2 * w2                           -- (the nearest pass of the road counts most where two run close)
@@ -1188,19 +1314,6 @@ local function touch(self, job, box, gx, gy)
   return box
 end
 
--- The block's height at a world point as it stands now (bilinear between the vertices), or nil.
-local function heightAt(tb, info, off, x, y)
-  local fx, fy = (x - info.px) / info.sq, (y - info.py) / info.sq
-  local gx, gy = floor(fx), floor(fy)
-  local tx, ty = fx - gx, fy - gy
-  if gx < 0 or gy < 0 or gx + 1 >= info.n or gy + 1 >= info.n then return nil end
-  local ok, a, b, c, d = pcall(function()
-    return tb:getHeightGrid(gx, gy), tb:getHeightGrid(gx + 1, gy), tb:getHeightGrid(gx, gy + 1), tb:getHeightGrid(gx + 1, gy + 1)
-  end)
-  if not (ok and type(a) == 'number' and type(b) == 'number' and type(c) == 'number' and type(d) == 'number') then return nil end
-  return off + (a * (1 - tx) + b * tx) * (1 - ty) + (c * (1 - tx) + d * tx) * ty
-end
-
 -- After the shaping: for each deck end, one compact line with the profile of the ground along the line every PROFILE_STEP_M (Earth's
 -- ground before our change, the height asked for, the ground written, and what a ray from above hits there: the deck, the ground), all as heights over
 -- the deck's top line going on past its end; and a check of what was written within the ramp, every metre: a step of STEP_WARN_M or more between two points 1 m apart
@@ -1271,6 +1384,11 @@ local function finish(self, job)
     s.structures = job.skipped
     s.stretches, s.fixLength, s.fixLargest = job.fixes.n, job.fixes.length, job.fixes.largest
     s.coveredM, s.tunnelSegments = job.fixes.covered, job.skipped.tunnel
+    s.crossings = job.fixes.crossings
+    s.crossAt = {}
+    for _, fx in ipairs(job.fixes.list) do
+      if fx.kind == 'tunnel crossing' then s.crossAt[#s.crossAt + 1] = { s0 = fx.s0, s1 = fx.s1, x = fx.x, y = fx.y, angle = fx.angle, arcM = fx.arcM, strip = fx.strip, change = fx.d } end
+    end
     -- (where the biggest change is, on the road's core or beside it, and what the cap held back)
     -- (only what is fixed is written, the rest of the road is as Earth made it)
     local f = job.fixes
@@ -1278,20 +1396,24 @@ local function finish(self, job)
       'largest change of the line %.1f m; %d cells written along %d segments in %d frames, %.1f ms, largest change %.1f m (%.1f m on the road core, ' ..
       'within %.1f m of the line); the ground asked for up to %.1f m (%.1f m on the core), %d cells held at %.1f m; ' ..
       'left alone: %d span, %d deck, %d no-ground segments; %d segments under an overpass, %d deck ends met; %.0f m of the line examined in the block, ' ..
-      '%d segments beside a tunnel left as Earth made them; %d cells beside the road kept clear of other roads', f.n, f.n == 1 and '' or 'es',
+      '%d segments beside a tunnel left as Earth made them; %d cells beside the road kept clear of other roads; %d of the stretches fixed are a road across a tunnel', f.n, f.n == 1 and '' or 'es',
       f.overpass or 0, f.spike or 0, (f.spike or 0) == 1 and '' or 's', f['deck end'] or 0, (f['deck end'] or 0) == 1 and '' or 's',
       f.length, f.largest, job.cells, job.S.n, job.frames, ms, job.maxChange, job.maxCore, M.CORE_M, job.wantedMax, job.wantedCore,
-      job.capped, M.MAX_CHANGE_M, job.skipped.span, job.skipped.deck, job.skipped.ground, job.skipped.over, job.skipped.pinned, f.covered, job.skipped.tunnel, job.S.kept or 0))
+      job.capped, M.MAX_CHANGE_M, job.skipped.span, job.skipped.deck, job.skipped.ground, job.skipped.over, job.skipped.pinned, f.covered, job.skipped.tunnel, job.S.kept or 0, f.crossings))
     -- (where each stretch is, in metres along its line and in the world, and what the colliders over the line were taken for:
     -- the 'deck ends' of a stage with no bridge were a collider the shaping took for a deck, and the log could not say where)
     reportRamps(self, job)
+    if not self.enabled and f.crossings > 0 then
+      log(self, 'I', string.format('shaping: the option is off; the ground where the stage crosses over a tunnel is still laid to the road (%d place%s)', f.crossings, f.crossings == 1 and '' or 's'))
+    end
     for q, fx in ipairs(f.list) do
       if q > M.LOG_STRETCHES then
         log(self, 'I', string.format('shaping: ... and %d more stretches fixed', #f.list - M.LOG_STRETCHES))
         break
       end
-      log(self, 'I', string.format('shaping: stretch %d, %s: %.0f to %.0f m along line %d, largest change %+.1f m at x %.0f, y %.0f',
-        q, fx.kind, fx.s0, fx.s1, fx.ln, fx.d, fx.x, fx.y))
+      log(self, 'I', string.format('shaping: stretch %d, %s: %.0f to %.0f m along line %d, largest change %+.1f m at x %.0f, y %.0f%s',
+        q, fx.kind, fx.s0, fx.s1, fx.ln, fx.d, fx.x, fx.y, fx.angle and string.format(' (a road across a tunnel at %.0f degrees, %.0f m from its nearer end, over a strip %.1f m either side of its axis)',
+          fx.angle, fx.arcM, fx.strip) or ''))
     end
     if f.spread > 0 then
       local at = f.spreadAt
@@ -1367,7 +1489,7 @@ local function cellShaper(self, job)
       job.capped = job.capped + 1
     end
     if a < minChange then return false end
-    if onCore then                                      -- (the lines Earth drew on the old ground stay where they were)
+    if onCore and not S.lv[kb] then                     -- (the lines Earth drew on the old ground stay where they were; on a road across a tunnel they are on the road's own height: that is where the ground goes)
       job.coreMoved = job.coreMoved + 1
       if a >= M.LINE_TOL_M then
         if z > orig then job.linesUp = job.linesUp + 1 else job.linesDown = job.linesDown + 1 end
@@ -1522,7 +1644,7 @@ end
 -- the frames as a job.
 function E:shapeNow()
   local env = self.env
-  if not (self.enabled and self.lines and self.dirty and not self.noSync) then return end
+  if not (self:wanted() and self.dirty and not self.noSync) then return end
   local tb = env.block and env.block() or nil
   if not tb then return end
   self.carX, self.carY, self.carSpeed = self:car()
@@ -1589,6 +1711,18 @@ end
 -- force: the cells under a moving car are done too (the session ends).
 function E:update(budgetMs, force)
   local env = self.env
+  -- (the tunnels Earth has built come with the road tiles, after the terrain: when there are more (or fewer) near the lines, the work is planned again)
+  if self.lines and not self.job and not self.dirty and env.tunnels and env.clock then
+    local t = env.clock()
+    if not self.tunSeen or t - self.tunSeen >= M.TUNNEL_POLL_S then
+      self.tunSeen = t
+      local n = self:tunnelsNear()
+      if n ~= (self.tunNear or 0) then
+        self.tunNear = n
+        self.dirty = self:wanted()
+      end
+    end
+  end
   if not (self.job or self.dirty or (self.rec and self.rec.n > 0)) then return end       -- (idle: not even the block lookup)
   local tb = env.block and env.block() or nil
   if not tb then
@@ -1667,7 +1801,7 @@ function E:status()
     capped = live and live.capped or s.capped, ms = s.ms, frames = s.frames, jobs = s.jobs, total = s.total,
     skipped = s.skipped, at = s.at, working = self.job ~= nil, syncCells = s.syncCells, syncMs = s.syncMs, deferred = s.deferred,
     stretches = s.stretches or 0, fixLength = s.fixLength or 0, fixLargest = s.fixLargest or 0, coveredM = s.coveredM or 0,
-    tunnelSegments = s.tunnelSegments or 0,
+    tunnelSegments = s.tunnelSegments or 0, crossings = s.crossings or 0, crossAt = s.crossAt or {},
     coreMoved = s.coreMoved or 0, linesStranded = (s.linesUp or 0) + (s.linesDown or 0),
   }
 end

@@ -1256,7 +1256,7 @@ local PRESHAPE_MARGIN_S = 30
 
 -- Starts the shaping of the stages on the block that is in (a launch behind the loading screen). Returns true when there is work to wait for.
 local function preshapeBegin()
-  if not st.shapeOn or not st.loadingSince then return false end
+  if not st.loadingSince then return false end
   local left = LOADING_MAX_S - (st.clock - st.loadingSince) - PRESHAPE_MARGIN_S
   if left <= 1 then
     ownLog('W', 'stage ground not shaped behind the loading screen: it has been held for ' .. string.format('%.0f s', st.clock - st.loadingSince))
@@ -1266,6 +1266,8 @@ local function preshapeBegin()
   if not lines or #lines == 0 then return false end
   local s = getShaper()
   s:setLines(lines)
+  -- (the option off: nothing to do here unless a road of the stage crosses over a tunnel, whose ground is laid whatever the option says)
+  if not s:wanted() then return false end
   s:update(PRESHAPE_BUDGET_MS)                  -- (the job begins now: no block, or none of the stage in it, is told at once)
   local state = s:status().state
   if not (s:busy() or state == 'shaped' or state == 'nothing to shape') or state == 'no terrain block' then
@@ -1337,8 +1339,10 @@ local function shapeStatusText()
   if not sh then return 'Ground: no terrain block seen yet' end
   local ago = sh.at and string.format('%.0f s ago', st.clock - sh.at) or 'not yet'
   -- (the road is Earth's own but where a defect of the data is fixed: how many stretches that is)
-  return string.format('Ground: %s%s; %d stretch%s fixed, %d cells, largest change %.1f m, last %s', sh.enabled and '' or 'switched off, ',
-    sh.state, sh.stretches, sh.stretches == 1 and '' or 'es', sh.cells, sh.maxChange, ago)
+  -- (a road of the stage across a tunnel is laid to the road's height whether the option is on or not)
+  local cross = sh.crossings > 0 and string.format(' (%d across a tunnel%s)', sh.crossings, sh.enabled and '' or ', done with the option off') or ''
+  return string.format('Ground: %s%s; %d stretch%s fixed%s, %d cells, largest change %.1f m, last %s', sh.enabled and '' or 'switched off, ',
+    sh.state, sh.stretches, sh.stretches == 1 and '' or 'es', cross, sh.cells, sh.maxChange, ago)
 end
 
 local placeTrigger       -- (below) puts the loop's start trigger on the service park in the current frame

@@ -179,8 +179,12 @@ def main():
             covers.append((geotiles.world_xy_map(pl.frame, frame, np.asarray(xy, np.float64)[:, :2]), float(hw)))
     z_graded = z_graded.reshape(la.shape)
     z_kept = z_kept.reshape(la.shape)
-    z_apply = g.apply(la, lo, z_ground, grading.ROAD_LIFT)     # Earth's own call: the replica must agree
+    z_apply = g.apply(la, lo, z_ground, grading.ROAD_LIFT)     # Earth's own call
     replica_err = float(np.nanmax(np.abs(z_apply - z_kept)))
+    # the step's result is Earth's own (an Earth tree whose put-back differs from the replica's rule: the replica only
+    # says where it would differ); what was changed over a tunnel is where Earth's result departs from the graded
+    z_kept = z_apply
+    revert_mask = cover_mask & (np.abs(z_apply - z_graded) > 1e-9).ravel()
 
     # step 5: the arches, over the whole block's box as build() passes it
     half = 512.0
@@ -255,7 +259,9 @@ def main():
     # the report
     lines = [f"block ({a.block[0]:g}, {a.block[1]:g}) of anchor {AID} at {lat0}, {lon0}; box {a.box}; "
              f"{X.size} samples, 1 m",
-             f"replica of _Planner.apply against Earth's own Grader.apply: largest difference {replica_err:.4f} m",
+             f"the old put-back rule (any change >= {grading.OVER_TUNNEL_SMALL_M} m over a tunnel back to the ground) "
+             f"against Earth's own Grader.apply: largest difference {replica_err:.4f} m (0: this tree has that rule; "
+             f"the steps below are Earth's own result either way)",
              f"session check: {sess_note}", ""]
     names = [k for k, _ in steps]
     for i in range(1, len(names)):
@@ -263,8 +269,8 @@ def main():
         lines.append(f"{names[i - 1]:>6} -> {names[i]:<6}: change min {np.nanmin(d):+7.2f} max {np.nanmax(d):+7.2f} m, "
                      f"{int((np.abs(d) > 0.1).sum())} samples moved > 0.1 m")
     lines.append(f"over a covered tunnel (_over_tunnels): {int(cover_mask.sum())} samples, "
-                 f"{int(revert_mask.sum())} of them put back to the ground (moved >= {grading.OVER_TUNNEL_SMALL_M} m), "
-                 f"{int(cover_mask.sum() - revert_mask.sum())} left graded (moved less)")
+                 f"{int(revert_mask.sum())} of them changed by the put-back (Earth's result != the graded), "
+                 f"{int(cover_mask.sum() - revert_mask.sum())} left as graded")
     lines.append(f"raceway ground: {int(race_mask.sum())} samples")
     lines.append("")
     lines.append(f"cover zones ({len(covers)}):")
